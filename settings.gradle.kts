@@ -23,5 +23,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "fingerprint_lib"
-include (":app")
+//include (":app")
 include (":fingerprint")
