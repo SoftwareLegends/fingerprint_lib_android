@@ -2,22 +2,22 @@ package com.fingerprint.utils
 
 
 enum class ScannedImageType(
-    val uploadCommand: Byte,
-    val fetchCommand: Byte,
+    val getCommand: Byte,
+    val captureCommand: Byte,
     val size: Int,
     val imageWidth: Int,
     val imageHeight: Int
 ) {
     Normal(
-        uploadCommand = Constants.UPLOAD_IMAGE_COMMAND,
-        fetchCommand = Constants.GET_IMAGE_COMMAND,
+        getCommand = Constants.GET_IMAGE_COMMAND,
+        captureCommand = Constants.CAPTURE_IMAGE_COMMAND,
         size = Constants.STD_BMP_SIZE,
         imageWidth = Constants.IMAGE_WIDTH,
         imageHeight = Constants.IMAGE_HEIGHT
     ),
     Extra(
-        uploadCommand = Constants.UPLOAD_IMAGE_EX_COMMAND,
-        fetchCommand = Constants.GET_IMAGE_EXTRA_COMMAND,
+        getCommand = Constants.GET_IMAGE_EXTRA_COMMAND,
+        captureCommand = Constants.CAPTURE_IMAGE_EXTRA_COMMAND,
         size = Constants.EXTRA_STD_BMP_SIZE,
         imageWidth = Constants.IMAGE_WIDTH,
         imageHeight = Constants.IMAGE_HEIGHT
