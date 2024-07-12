@@ -15,7 +15,6 @@ import com.fingerprint.utils.UsbOperationHelper.intToByteArray
 import com.fingerprint.utils.Constants.BMP_DESTINATION_OFFSET
 import com.fingerprint.utils.Constants.END_DATA_PACKET
 import com.fingerprint.utils.Constants.FILL_PACKAGE_COMMAND
-import com.fingerprint.utils.Constants.GENERATE_CHARACTER_COMMAND
 import com.fingerprint.utils.Constants.MAX_PACKAGE_SIZE
 import com.fingerprint.utils.Constants.RESPONSE_PACKET
 import com.fingerprint.utils.Constants.RETURN_FAIL
@@ -87,34 +86,18 @@ internal class HfSecurityFingerprint(
         return bitmapArray
     }
 
-    override fun generateCharacterImage(): Boolean {
-        val command = ByteArray(10).apply {
-            this[0] = GENERATE_CHARACTER_COMMAND
-            this[1] = 1.toByte()
-        }
-        val sendData = ByteArray(MAX_PACKAGE_SIZE)
-        val receiveData = ByteArray(MAX_PACKAGE_SIZE)
-
-        fillPackage(sendData, FILL_PACKAGE_COMMAND.toInt(), 2, command)
-
-        if (!sendPackage(address = imageType.ordinal, sendData)) return false
-        if (!receivePackage(receiveData, 64, TIMEOUT)) throw DeviceFailException()
-
-        return verifyResponsePackage(receiveData)
-    }
-
-    override fun uploadImageData(): ByteArray? {
+    override fun getImageData(): ByteArray? {
         val imageData = ByteArray(imageType.size)
         val result = if (imageType == ScannedImageType.Normal)
-            uploadImageData(imageData)
+            getImageData(imageData)
         else
-            uploadImageDataEx(imageData)
+            getImageDataExtra(imageData)
         return if (result) imageData else null
     }
 
-    override fun fetchImageData(imageType: ScannedImageType): Boolean = runCatching {
+    override fun captureImage(imageType: ScannedImageType): Boolean = runCatching {
         this.imageType = imageType
-        val command = ByteArray(10).apply { this[0] = imageType.fetchCommand }
+        val command = ByteArray(10).apply { this[0] = imageType.captureCommand }
         val sendData = ByteArray(MAX_PACKAGE_SIZE)
         val receiveData = ByteArray(MAX_PACKAGE_SIZE)
 
@@ -125,7 +108,7 @@ internal class HfSecurityFingerprint(
         if (!receivePackage(receiveData, 64, TIMEOUT)) throw DeviceFailException()
 
         return verifyResponsePackage(receiveData)
-    }.onFailure { Log.e("DEBUGGING", "fetchImageData() -> $it") }
+    }.onFailure { Log.e("DEBUGGING", "captureImage() -> $it") }
         .getOrDefault(false)
 
     private fun initializeUsbDeviceType(device: UsbDevice): Boolean {
@@ -402,12 +385,12 @@ internal class HfSecurityFingerprint(
             false
     }
 
-    private fun uploadImageData(
+    private fun getImageData(
         imageData: ByteArray,
-        uploadCommand: ScannedImageType = ScannedImageType.Normal
+        imageType: ScannedImageType = ScannedImageType.Normal
     ): Boolean {
         val command = ByteArray(10).apply {
-            this[0] = uploadCommand.uploadCommand
+            this[0] = imageType.getCommand
         }
 
         val sendData = ByteArray(MAX_PACKAGE_SIZE)
@@ -415,12 +398,12 @@ internal class HfSecurityFingerprint(
 
         if (sendPackage(GENERAL_SEND_PACKAGE_ADDRESS, sendData).not()) return false
 
-        return receiveUsbImage(imageData, uploadCommand.size)
+        return receiveUsbImage(imageData, imageType.size)
     }
 
-    private fun uploadImageDataEx(imageData: ByteArray): Boolean = uploadImageData(
+    private fun getImageDataExtra(imageData: ByteArray): Boolean = getImageData(
         imageData = imageData,
-        uploadCommand = ScannedImageType.Extra
+        imageType = ScannedImageType.Extra
     )
 
     override fun verifyPassword(password: ByteArray): Boolean {

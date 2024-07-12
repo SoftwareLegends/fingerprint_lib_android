@@ -178,20 +178,18 @@ internal class FingerprintManagerImpl(
 
     private suspend fun processCapture() {
         emitEvent(if (captureIndex == 0) FingerprintEvent.PlaceFinger else FingerprintEvent.KeepFinger)
+
         if (!captureImage()) return
 
-        if (!uploadAndProcessImage()) return
-
-        if (!generateCharacterImage()) return
+        if (!getImageData()) return
     }
 
     private suspend fun captureImage(): Boolean {
         var timeout = 0
 
         while (true) {
-            if (fingerprintScanner.fetchImageData(imageType)) return true
-            else if (captureIndex in 1..captureCount)
-                cancel()
+            if (fingerprintScanner.captureImage(imageType)) return true
+            else if (captureIndex in 1..captureCount) cancel()
             delay(SCAN_DELAY_IN_MILLIS)
             timeout++
             if (timeout > timeoutCount) {
@@ -202,8 +200,8 @@ internal class FingerprintManagerImpl(
         }
     }
 
-    private fun uploadAndProcessImage(): Boolean = runCatching {
-        val imageData = fingerprintScanner.uploadImageData()
+    private fun getImageData(): Boolean = runCatching {
+        val imageData = fingerprintScanner.getImageData()
         if (imageData != null) {
             val bitmapArray = fingerprintScanner.convertImageToBitmapArray(imageData)
             captures.add(bitmapArray.toBitmap())
@@ -215,13 +213,6 @@ internal class FingerprintManagerImpl(
         }
         return true
     }.getOrDefault(false)
-
-    private fun generateCharacterImage(): Boolean = runCatching {
-        if (fingerprintScanner.generateCharacterImage()) return true
-        emitEvent(FingerprintEvent.CapturingFailed)
-        return false
-    }.onFailure { Log.e("DEBUGGING", it.toString()) }
-        .getOrDefault(false)
 
     private fun findTheBestCapture(byteArray: ByteArray) {
         val newValue = byteArray.sum()

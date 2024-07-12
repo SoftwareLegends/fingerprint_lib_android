@@ -9,8 +9,7 @@ internal interface FingerprintScanner {
     fun reconnect(usbDevice: UsbDevice): Boolean
     fun disconnect(): Boolean
     fun verifyPassword(password: ByteArray): Boolean
-    fun generateCharacterImage(): Boolean
-    fun fetchImageData(imageType: ScannedImageType): Boolean
-    fun uploadImageData(): ByteArray?
+    fun captureImage(imageType: ScannedImageType): Boolean
+    fun getImageData(): ByteArray?
     fun convertImageToBitmapArray(imageData: ByteArray): ByteArray
 }
