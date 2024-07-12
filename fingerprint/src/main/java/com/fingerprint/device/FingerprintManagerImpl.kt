@@ -1,6 +1,5 @@
 package com.fingerprint.device
 
-import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -23,6 +22,7 @@ import com.fingerprint.device.FingerprintManagerImpl.Companion.ACTION_USB_PERMIS
 import com.fingerprint.device.FingerprintManagerImpl.Companion.isHfSecurityDevice
 import com.fingerprint.scanner.FingerprintScanner
 import com.fingerprint.utils.ScannedImageType
+import com.fingerprint.utils.returnUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -81,7 +81,6 @@ internal class FingerprintManagerImpl(
             context.unregisterReceiver(usbReceiver)
     }
 
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun registerReceiver() {
         permissionIntent = context.createPendingIntent()
         val filter = IntentFilter(ACTION_USB_PERMISSION).apply {
@@ -92,6 +91,7 @@ internal class FingerprintManagerImpl(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             context.registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         else
+            @Suppress("UnspecifiedRegisterReceiverFlag")
             context.registerReceiver(usbReceiver, filter)
     }
 
@@ -107,7 +107,7 @@ internal class FingerprintManagerImpl(
     }
 
     private val usbReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
+        override fun onReceive(context: Context, intent: Intent) = synchronized(this) {
             when (intent.action) {
                 ACTION_USB_PERMISSION -> {
                     val device: UsbDevice = (
@@ -120,7 +120,7 @@ internal class FingerprintManagerImpl(
                                 @Suppress("DEPRECATION")
                                 intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
                             )
-                        ?: return run { eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed) }
+                        ?: return eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed).returnUnit()
 
                     val isGranted = intent.getBooleanExtra(
                         UsbManager.EXTRA_PERMISSION_GRANTED,
@@ -147,7 +147,7 @@ internal class FingerprintManagerImpl(
 
                 else -> Unit
             }
-        }
+        }.returnUnit()
     }
 
     private suspend fun startProcessing() = runCatching {
