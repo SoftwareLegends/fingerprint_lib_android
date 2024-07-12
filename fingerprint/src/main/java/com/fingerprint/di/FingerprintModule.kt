@@ -1,6 +1,7 @@
 package com.fingerprint.di
 
 import android.content.Context
+import androidx.lifecycle.Lifecycle
 import com.fingerprint.communication.DefaultUsbDeviceCommunicatorImpl
 import com.fingerprint.communication.UsbDeviceCommunicator
 import com.fingerprint.device.FingerprintManager
@@ -12,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 
 internal class FingerprintModule(
     private val context: Context,
+    private val lifecycle: Lifecycle,
     private val scope: CoroutineScope
 ) {
     private val usbDeviceCommunicator: UsbDeviceCommunicator by lazy {
@@ -26,6 +28,7 @@ internal class FingerprintModule(
         FingerprintManagerImpl(
             scope = scope,
             context = context,
+            lifecycle = lifecycle,
             fingerprintScanner = hfSecurityFingerprintScanner
         )
     }

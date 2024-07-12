@@ -5,6 +5,7 @@ import com.fingerprint.utils.ScannedImageType
 
 
 internal interface FingerprintScanner {
+    fun tunOffLed()
     fun connect(usbDevice: UsbDevice): Boolean
     fun reconnect(usbDevice: UsbDevice): Boolean
     fun disconnect(): Boolean

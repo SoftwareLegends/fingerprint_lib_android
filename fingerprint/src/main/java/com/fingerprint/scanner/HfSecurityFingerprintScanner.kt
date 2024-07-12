@@ -30,6 +30,8 @@ internal class HfSecurityFingerprint(
     private var deviceType: Int = 0
     private var imageType: ScannedImageType = ScannedImageType.Normal
 
+    override fun tunOffLed() = captureImage(imageType).returnUnit()
+
     override fun connect(usbDevice: UsbDevice): Boolean {
         if (usbDeviceCommunicator.openUsbDeviceConnection(usbDevice).not()) return false
 
@@ -424,3 +426,5 @@ internal class HfSecurityFingerprint(
         return verifyResponsePackage(receiveData)
     }
 }
+
+private fun Any.returnUnit() = Unit

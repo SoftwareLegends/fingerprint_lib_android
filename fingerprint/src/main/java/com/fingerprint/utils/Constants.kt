@@ -10,8 +10,6 @@ internal object Constants {
     const val EXTRA_STD_BMP_SIZE: Int =
         (EXTRA_IMAGE_WIDTH * EXTRA_IMAGE_HEIGHT) + BMP_DESTINATION_OFFSET
 
-    const val TIMEOUT_LONG: Int = 0x7FFFFFFF
-
     const val RETURN_OK: Int = 0
     const val RETURN_FAIL: Int = -1
     const val DEVICE_FAIL: Int = -2

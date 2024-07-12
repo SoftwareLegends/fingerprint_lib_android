@@ -18,12 +18,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.getSystemService
+import androidx.lifecycle.Lifecycle
 import com.fingerprint.device.FingerprintManagerImpl.Companion.ACTION_USB_PERMISSION
 import com.fingerprint.device.FingerprintManagerImpl.Companion.isHfSecurityDevice
 import com.fingerprint.scanner.FingerprintScanner
-import com.fingerprint.utils.Constants
 import com.fingerprint.utils.ScannedImageType
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -32,6 +33,7 @@ import kotlinx.coroutines.launch
 internal class FingerprintManagerImpl(
     private val scope: CoroutineScope,
     private val context: Context,
+    private val lifecycle: Lifecycle,
     private val fingerprintScanner: FingerprintScanner
 ) : FingerprintManager {
     override val eventsFlow = MutableStateFlow<FingerprintEvent>(FingerprintEvent.Idle)
@@ -40,48 +42,44 @@ internal class FingerprintManagerImpl(
     override var bestCaptureIndex: Int = Int.MIN_VALUE
     private var bestCaptureValue: Int = Int.MIN_VALUE
     private var imageType: ScannedImageType = ScannedImageType.Extra
-    private var isCanceled = false
-    private var isOpening = false
-    private var captureCount = 0
-    private var captureIndex = 0
-    private var captureTimeout = 0
-    private var timeoutCount = Constants.TIMEOUT_LONG
+    private var scanningJob: Job? = null
+    private var isCanceled: Boolean = false
+    private var isConnected: Boolean = false
+    private var captureCount: Int = 0
+    private var captureIndex: Int = 0
+    private var captureTimeout: Int = 0
     private var permissionIntent: PendingIntent? = null
     private val usbManager: UsbManager? = context.getSystemService()
 
     override fun connect() {
-        isCanceled = false
-        isOpening = false
-
         registerReceiver()
         requestUsbPermission()
+        if (isConnected) fingerprintScanner.tunOffLed()
     }
 
     override fun disconnect() {
         isCanceled = true
-        isOpening = false
-
-        runCatching { unregisterReceiver() }
+        isConnected = false
+        unregisterReceiver()
         fingerprintScanner.disconnect()
-        emitEvent(FingerprintEvent.Disconnected)
+        eventsFlow.tryEmit(FingerprintEvent.Disconnected)
     }
 
     override fun scan(count: Int): Boolean {
-        if (!isOpening) return false
-        captures.clear()
-        bestCapture = null
+        if (!isConnected) {
+            eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed)
+            return false
+        }
+        reset()
         captureCount = count.coerceAtMost(MAX_SCAN_COUNT)
-        captureIndex = 0
-        captureTimeout = 0
-        scope.launch { startProcessing() }
+        scanningJob = scope.launch { startProcessing() }
         return true
     }
 
-    private fun emitEvent(message: FingerprintEvent) {
-        eventsFlow.value = message
+    private fun unregisterReceiver() = runCatching {
+        if (lifecycle.currentState == Lifecycle.State.CREATED)
+            context.unregisterReceiver(usbReceiver)
     }
-
-    private fun unregisterReceiver() = context.unregisterReceiver(usbReceiver)
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun registerReceiver() {
@@ -100,84 +98,88 @@ internal class FingerprintManagerImpl(
     private fun requestUsbPermission() {
         usbManager.supportedDevice?.let { device ->
             if (usbManager!!.hasPermission(device))
-                isOpening = fingerprintScanner.reconnect(device).apply {
-                    emitEvent(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
+                isConnected = fingerprintScanner.reconnect(device).apply {
+                    eventsFlow.tryEmit(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
                 }
-            else synchronized(usbReceiver) {
+            else
                 usbManager.requestPermission(device, permissionIntent)
-            }
-        } ?: emitEvent(FingerprintEvent.Idle)
+        } ?: eventsFlow.tryEmit(FingerprintEvent.Idle)
     }
 
     private val usbReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = when (intent.action) {
-            ACTION_USB_PERMISSION -> synchronized(this) {
-                val device: UsbDevice = (
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                            intent.getParcelableExtra(
-                                UsbManager.EXTRA_DEVICE,
-                                UsbDevice::class.java
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                ACTION_USB_PERMISSION -> {
+                    val device: UsbDevice = (
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                                intent.getParcelableExtra(
+                                    UsbManager.EXTRA_DEVICE,
+                                    UsbDevice::class.java
+                                )
+                            else
+                                @Suppress("DEPRECATION")
+                                intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
                             )
-                        else
-                            @Suppress("DEPRECATION")
-                            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                        ) ?: return@synchronized emitEvent(FingerprintEvent.ConnectingFailed)
+                        ?: return run { eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed) }
 
-                val isGranted = intent.getBooleanExtra(
-                    UsbManager.EXTRA_PERMISSION_GRANTED,
-                    false
-                )
+                    val isGranted = intent.getBooleanExtra(
+                        UsbManager.EXTRA_PERMISSION_GRANTED,
+                        false
+                    )
 
-                if (isGranted)
-                    isOpening = fingerprintScanner.reconnect(device).apply {
-                        emitEvent(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
-                    }
-                else
-                    emitEvent(FingerprintEvent.ConnectingFailed)
+                    if (isGranted)
+                        isConnected = fingerprintScanner.reconnect(device).apply {
+                            eventsFlow.tryEmit(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
+                        }
+                    else
+                        eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed)
+                }
+
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                    eventsFlow.tryEmit(FingerprintEvent.DeviceAttached)
+                    requestUsbPermission()
+                }
+
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                    eventsFlow.tryEmit(FingerprintEvent.DeviceDetached)
+                    disconnect()
+                }
+
+                else -> Unit
             }
-
-            UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-                emitEvent(FingerprintEvent.DeviceAttached)
-                requestUsbPermission()
-            }
-
-            UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                emitEvent(FingerprintEvent.DeviceDetached)
-                disconnect()
-            }
-
-            else -> Unit
         }
     }
 
     private suspend fun startProcessing() = runCatching {
-        if (!isOpening) {
-            emitEvent(FingerprintEvent.ConnectingFailed)
-            return@runCatching
-        }
-
-        captureIndex = 0
-        while (isCanceled.not()) {
+        for (i in 0..<captureCount) {
+            if (isCanceled) return@runCatching
+            captureIndex = i
             processCapture()
-            captureIndex++
-
-            if (captureIndex >= captureCount) {
-                emitEvent(FingerprintEvent.CapturedSuccessfully)
-                break
-            }
         }
-        isCanceled = false
+        eventsFlow.emit(FingerprintEvent.CapturedSuccessfully)
+        bestCapture = captures[bestCaptureIndex]
     }.onFailure { Log.e("DEBUGGING", it.toString()) }
 
-    private fun cancel() {
+    private fun onFingerLiftDuringScanning() {
+        scanningJob?.cancel()
         isCanceled = true
+        eventsFlow.tryEmit(FingerprintEvent.ProcessCanceledTheFingerLifted)
+    }
+
+    private fun reset() {
+        scanningJob?.cancel()
         captures.clear()
         bestCapture = null
-        emitEvent(FingerprintEvent.ProcessCanceledTheFingerLifted)
+        scanningJob = null
+        isCanceled = false
+        captureIndex = 0
+        captureTimeout = 0
+        bestCaptureIndex = Int.MIN_VALUE
+        bestCaptureValue = Int.MIN_VALUE
     }
 
     private suspend fun processCapture() {
-        emitEvent(if (captureIndex == 0) FingerprintEvent.PlaceFinger else FingerprintEvent.KeepFinger)
+        eventsFlow.emit(if (captureIndex == 0) FingerprintEvent.PlaceFinger else FingerprintEvent.KeepFinger)
 
         if (!captureImage()) return
 
@@ -185,17 +187,10 @@ internal class FingerprintManagerImpl(
     }
 
     private suspend fun captureImage(): Boolean {
-        var timeout = 0
-
         while (true) {
-            if (fingerprintScanner.captureImage(imageType)) return true
-            else if (captureIndex in 1..captureCount) cancel()
             delay(SCAN_DELAY_IN_MILLIS)
-            timeout++
-            if (timeout > timeoutCount) {
-                emitEvent(FingerprintEvent.Timeout)
-                return false
-            }
+            if (fingerprintScanner.captureImage(imageType)) return true
+            if (captureIndex in 1..captureCount) onFingerLiftDuringScanning()
             if (isCanceled) return false
         }
     }
@@ -204,11 +199,11 @@ internal class FingerprintManagerImpl(
         val imageData = fingerprintScanner.getImageData()
         if (imageData != null) {
             val bitmapArray = fingerprintScanner.convertImageToBitmapArray(imageData)
-            captures.add(bitmapArray.toBitmap())
             findTheBestCapture(bitmapArray)
-            emitEvent(FingerprintEvent.NewImage(bitmapArray))
+            captures.add(bitmapArray.toBitmap())
+            eventsFlow.tryEmit(FingerprintEvent.NewImage(bitmapArray))
         } else {
-            emitEvent(FingerprintEvent.CapturingFailed)
+            eventsFlow.tryEmit(FingerprintEvent.CapturingFailed)
             return false
         }
         return true
@@ -219,13 +214,12 @@ internal class FingerprintManagerImpl(
         if (newValue > bestCaptureValue) {
             bestCaptureValue = newValue
             bestCaptureIndex = captureIndex
-            bestCapture = captures.last()
         }
     }
 
     companion object {
         const val MAX_SCAN_COUNT = 5
-        const val SCAN_DELAY_IN_MILLIS: Long = 100
+        const val SCAN_DELAY_IN_MILLIS: Long = 50
         const val ACTION_USB_PERMISSION = "com.fingerprint.USB_PERMISSION"
 
         fun isHfSecurityDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {

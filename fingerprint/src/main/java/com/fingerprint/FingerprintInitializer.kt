@@ -12,7 +12,14 @@ class FingerprintInitializer(
     private val lifecycle: Lifecycle,
     private val scope: CoroutineScope
 ) {
-    private val module: FingerprintModule by lazy { FingerprintModule(context, scope) }
+    private val module: FingerprintModule by lazy {
+        FingerprintModule(
+            context = context,
+            scope = scope,
+            lifecycle = lifecycle
+        )
+    }
+
     private val instance: FingerprintManager by lazy {
         object : FingerprintManager by module.fingerprintManager {}
     }
