@@ -24,7 +24,7 @@ This library provides a simple and efficient way to integrate fingerprint scanne
     <th>Video</th>
   </tr>
   <tr align="center">
-    <td width="50%"> <br/><br/><img src="https://github.com/user-attachments/assets/9c5c7467-f6d6-475a-a90b-4539e64cbcc4" width="65%"/> </td>
+    <td width="50%"> <img src="https://github.com/user-attachments/assets/9c5c7467-f6d6-475a-a90b-4539e64cbcc4" width="65%"/> </td>
     <td width="50%"> <video src="https://github.com/user-attachments/assets/779f1bb5-38f8-40a5-8d58-70842ab2c399" width="65%"/> </td>
   </tr>
 </table>
