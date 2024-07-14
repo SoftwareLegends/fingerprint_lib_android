@@ -6,52 +6,53 @@ This library provides a simple and efficient way to integrate fingerprint scanne
 
 <br/>
 
-## Features
+## ✨ Key Features
 
-- **Easy Integration:** Get started quickly with a straightforward setup process.
-- **Real-time Events:** Respond to fingerprint events like device connection, capture success, and more.
-- **Image Handling:** Conveniently access and utilize captured fingerprint images.
-- **Multiple Scanner Support:**  Compatible with fingerprint scanners from different manufacturers including HF Security and Futronic.
+- **Effortless Integration:** Get started quickly with a simple setup.
+- **Real-time Feedback:** Respond to fingerprint events such as device connection, capture success, and errors.
+- **Image Handling:**  Conveniently access and use captured fingerprint images.
+- **Multiple Scanner Support:**  Works with fingerprint scanners from different manufacturers including HF Security and Futronic.
+
 
 <br/>
 
-## Preview
+## 🎬 Preview
 
 <table>
   <tr>
-    <th>Before</th>
-    <th>After</th>
+    <th>Screenshoot</th>
+    <th>Video</th>
   </tr>
-  <tr>
-    <td width="50%"> <video src="x"/> </td>
-    <td width="50%"> <video src="x"/> </td>
+  <tr align="center">
+    <td width="50%"> <br/><br/><img src="https://github.com/user-attachments/assets/9c5c7467-f6d6-475a-a90b-4539e64cbcc4" width="61%"/> </td>
+    <td width="50%"> <video src="https://github.com/user-attachments/assets/779f1bb5-38f8-40a5-8d58-70842ab2c399" width="65%"/> </td>
   </tr>
 </table>
 
 <br/>
 
-## Getting Started
+## 🚀 Getting Started
 
-### 1. Add JitPack Repository
+### 1. Include JitPack Repository
 
-Add the JitPack repository to your root `build.gradle` file:
+In your project's root `build.gradle` file, add the JitPack repository:
 
 ```gradle
 allprojects {
     repositories {
         ...
-        maven { url = "https://jitpack.io" }
+        maven { url 'https://jitpack.io' } 
     }
 }
 ```
 
-### 2. Add the Dependency
+### 2. Add the Library Dependency
 
-Include the library dependency in your module-level `build.gradle` file:
+Include the library in your module-level `build.gradle`:
 
 ```gradle
 dependencies {
-    implementation("com.github.SoftwareLegends:fingerprint_lib_android:<LATEST_VERSION>")
+    implementation("com.github.SoftwareLegends:fingerprint_lib_android:<LATEST_VERSION>") 
 }
 ```
 
@@ -59,11 +60,11 @@ Replace `<LATEST_VERSION>` with the latest version from the badge at the top of 
 
 <br/>
 
-## Usage
+## 💻 Usage
 
-### Initialization
+### 1. Initialize the Fingerprint Manager
 
-Initialize the fingerprint manager in your activity or fragment:
+Initialize the fingerprint manager within your activity or fragment:
 
 ```kotlin
 import com.fingerprint.FingerprintInitializer
@@ -84,9 +85,9 @@ class MainActivity : ComponentActivity() {
 }
 ```
 
-### Method 1: Handling Fingerprint Events
+### 2. Collect Fingerprint Events
 
-You can collect fingerprint events using a flow:
+Use a Flow to collect and respond to fingerprint events:
 
 ```kotlin
 lifecycleScope.launch {
@@ -105,7 +106,8 @@ lifecycleScope.launch {
 }
 ```
 
-**Or using `collectAsState()` in compose**
+Alternatively, you can use `collectAsState()` within Compose:
+
 ```kotlin
 val event = fingerprintManager.eventsFlow.collectAsState()
 
@@ -117,24 +119,61 @@ LaunchedEffect(key1 = event) {
         FingerprintEvent.ConnectingFailed -> { /* Handle connection failure */ }
         // ... Handle other events
         is FingerprintEvent.NewImage -> { 
-        val bitmap = event.bitmapArray // Access the captured fingerprint image
-        // ... Do something with the bitmap
+            val bitmap = event.bitmapArray // Access the captured fingerprint image
+            // ... Do something with the bitmap
         }
     }
 }
 ```
 
-### Method 2: Accessing Captured Images
+### 3. Accessing Captured Images
 
-Retrieve a list of captured fingerprint images:
+> Note: This is updated in real-time you can use it instead of `FingerprintEvent.NewImage` event
+
+Retrieve a list of captured images: 
 
 ```kotlin
 val capturedImages: List<ImageBitmap> = fingerprintManager.captures 
 ```
 
+### 4. Initiate Fingerprint Scanning
+
+Use the `scan()` method to start capturing fingerprints:
+
+```kotlin
+val isScanning = fingerprintManager.scan(count = 5) // 'count' is the number of desired captures
+
+if (isScanning.not()) { 
+    Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show() 
+}
+```
+
+**Important Notes:**
+
+- The connection and disconnection lifecycle are automatically handled, simplifying your code.
+- Access the best quality capture image with `bestCapture` and its index with `bestCaptureIndex`.
+
+The `FingerprintManager` interface exposes convenient methods and properties for seamless integration:
+
+```kotlin
+interface FingerprintManager : DefaultLifecycleObserver {
+    val eventsFlow: StateFlow<FingerprintEvent>
+    val captures: List<ImageBitmap>
+    val bestCapture: ImageBitmap?
+    val bestCaptureIndex: Int
+
+    fun connect()
+    fun disconnect()
+    fun scan(count: Int): Boolean
+
+    override fun onResume(owner: LifecycleOwner) = connect()
+    override fun onStop(owner: LifecycleOwner) = disconnect()
+}
+```
+
 <br/>
 
-## Supported Fingerprint Scanners
+## 🤝  Supported Fingerprint Scanners
 
 - **[HF Security](https://hfsecurity.cn/)**
     - [HF4000](https://hfsecurity.cn/hf4000-optical-android-fingerprint-scanner/) `(Tested and verified)` ✅
@@ -144,19 +183,19 @@ val capturedImages: List<ImageBitmap> = fingerprintManager.captures
 
 <br/>
 
-## Sample Application
+## 🗃️  Sample Application
 
-A sample application demonstrating the library's functionality is available in the [`app`](/app) directory.
-
-<br/>
-
-## Contributing
-
-Contributions are welcome! If you find any issues or have suggestions for improvement, please feel free to open an issue or submit a pull request.
+A sample application showcasing the library's functionalities is available in the [`app`](/app) directory.
 
 <br/>
 
-## License
+## 🙌  Contributing
+
+Contributions are always welcome! If you find any issues or have suggestions for improvement, feel free to open an issue or submit a pull request.
+
+<br/>
+
+## 📄  License
 
 This project is licensed under the [MIT License](LICENSE).
 
