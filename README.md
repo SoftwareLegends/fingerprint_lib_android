@@ -186,7 +186,7 @@ interface FingerprintManager : DefaultLifecycleObserver {
 ## 🗃️  Sample Application
 
 A sample application showcasing the library's functionalities is available in the [`app`](/app) directory.
-> [download the apk](/sample/sample.apk)
+> [download the apk](https://github.com/SoftwareLegends/fingerprint_lib_android/raw/develop/sample/sample.apk)
 
 <br/>
 
