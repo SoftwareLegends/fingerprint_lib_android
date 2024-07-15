@@ -22,6 +22,7 @@ import com.fingerprint.utils.Constants.TIMEOUT
 import com.fingerprint.utils.Constants.GENERAL_SEND_PACKAGE_ADDRESS
 import com.fingerprint.utils.Constants.VERIFY_PASSWORD_COMMAND
 import com.fingerprint.utils.DeviceFailException
+import com.fingerprint.utils.returnUnit
 
 
 internal class HfSecurityFingerprint(
@@ -426,5 +427,3 @@ internal class HfSecurityFingerprint(
         return verifyResponsePackage(receiveData)
     }
 }
-
-private fun Any.returnUnit() = Unit

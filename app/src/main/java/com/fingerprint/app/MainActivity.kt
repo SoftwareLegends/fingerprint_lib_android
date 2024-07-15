@@ -95,7 +95,7 @@ fun App(fingerprintManager: FingerprintManager) {
                 status = events.message
             }
 
-            is FingerprintEvent.NewImage -> Unit
+            is FingerprintEvent.NewImage -> println("DEBUGGING -> NEW IMAGE")
             else -> status = events.message
         }
     }
