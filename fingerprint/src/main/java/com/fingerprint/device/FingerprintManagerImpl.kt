@@ -195,13 +195,14 @@ internal class FingerprintManagerImpl(
         }
     }
 
-    private fun getImageData(): Boolean = runCatching {
+    private suspend fun getImageData(): Boolean = runCatching {
         val imageData = fingerprintScanner.getImageData()
         if (imageData != null) {
             val bitmapArray = fingerprintScanner.convertImageToBitmapArray(imageData)
             findTheBestCapture(bitmapArray)
             captures.add(bitmapArray.toBitmap())
-            eventsFlow.tryEmit(FingerprintEvent.NewImage(bitmapArray))
+            eventsFlow.emit(FingerprintEvent.NewImage(bitmapArray))
+            delay(SCAN_DELAY_IN_MILLIS)
         } else {
             eventsFlow.tryEmit(FingerprintEvent.CapturingFailed)
             return false
