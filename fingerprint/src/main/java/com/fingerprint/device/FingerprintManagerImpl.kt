@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
 import com.fingerprint.device.FingerprintManagerImpl.Companion.ACTION_USB_PERMISSION
+import com.fingerprint.device.FingerprintManagerImpl.Companion.isFutronicDevice
 import com.fingerprint.device.FingerprintManagerImpl.Companion.isHfSecurityDevice
 import com.fingerprint.scanner.FingerprintScanner
 import com.fingerprint.utils.ScannedImageType
@@ -40,6 +41,9 @@ internal class FingerprintManagerImpl(
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
     override var bestCapture: ImageBitmap? by mutableStateOf(null)
     override var bestCaptureIndex: Int = Int.MIN_VALUE
+    override val deviceInfo: FingerprintDeviceInfo
+        get() = fingerprintScanner.deviceInfo
+
     private var bestCaptureValue: Int = Int.MIN_VALUE
     private var imageType: ScannedImageType = ScannedImageType.Extra
     private var scanningJob: Job? = null
@@ -179,7 +183,13 @@ internal class FingerprintManagerImpl(
     }
 
     private suspend fun processCapture() {
-        eventsFlow.emit(if (captureIndex == 0) FingerprintEvent.PlaceFinger else FingerprintEvent.KeepFinger)
+        val progress: Float = (captureIndex + 1) / captureCount.toFloat()
+        eventsFlow.emit(
+            if (captureIndex == 0)
+                FingerprintEvent.PlaceFinger
+            else
+                FingerprintEvent.KeepFinger(progress = progress)
+        )
 
         if (!captureImage()) return
 
@@ -230,11 +240,20 @@ internal class FingerprintManagerImpl(
             1155 -> productId in listOf(22304, 22240)
             else -> false
         }
+
+        fun isFutronicDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {
+            2100 -> productId == 32
+            2392 -> productId == 775
+            8122 -> productId in listOf(18, 19, 39)
+            5265 -> productId in listOf(32, 37, 136, 144, 80, 96, 152, 32920, 39008)
+            else -> false
+        }
     }
 }
 
 private fun UsbDevice.isSupportedDevice(): Boolean =
     isHfSecurityDevice(vendorId = vendorId, productId = productId)
+            || isFutronicDevice(vendorId = vendorId, productId = productId)
 
 private fun Context.createPendingIntent(): PendingIntent {
     val intent = Intent(ACTION_USB_PERMISSION)
