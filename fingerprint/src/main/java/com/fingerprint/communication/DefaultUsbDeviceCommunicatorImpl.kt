@@ -5,6 +5,7 @@ import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbEndpoint
+import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import androidx.core.content.getSystemService
 import com.fingerprint.utils.Constants.DEVICE_FAIL
@@ -19,10 +20,12 @@ internal class DefaultUsbDeviceCommunicatorImpl(
     private var endpointOutMaxSize = 0
     private var usbEndpointIn: UsbEndpoint? = null
     private var usbEndpointOut: UsbEndpoint? = null
+    private var usbInterface: UsbInterface? = null
     private var usbConnection: UsbDeviceConnection? = null
     private var usbManager: UsbManager? = context.getSystemService()
 
     override fun closeUsbDevice(): Boolean {
+        runCatching { usbConnection?.releaseInterface(usbInterface) }
         usbConnection?.close()
         return true
     }
@@ -30,14 +33,16 @@ internal class DefaultUsbDeviceCommunicatorImpl(
     override fun openUsbDeviceConnection(usbDevice: UsbDevice): Boolean {
         usbConnection = usbManager?.openDevice(usbDevice) ?: return false
 
-        val usbInterface = usbDevice.getInterface(0)
+        usbInterface = usbDevice.getInterface(0)
         usbConnection?.claimInterface(usbInterface, true)
 
-        for (i in 0 until usbInterface.endpointCount)
-            when (usbInterface.getEndpoint(i).direction) {
-                UsbConstants.USB_DIR_IN -> usbEndpointIn = usbInterface.getEndpoint(i)
-                UsbConstants.USB_DIR_OUT -> usbEndpointOut = usbInterface.getEndpoint(i)
-            }
+        usbInterface?.let { usbInterface ->
+            for (i in 0 until usbInterface.endpointCount)
+                when (usbInterface.getEndpoint(i).direction) {
+                    UsbConstants.USB_DIR_IN -> usbEndpointIn = usbInterface.getEndpoint(i)
+                    UsbConstants.USB_DIR_OUT -> usbEndpointOut = usbInterface.getEndpoint(i)
+                }
+        }
 
         endpointInMaxSize = usbEndpointIn?.maxPacketSize ?: return false
         endpointOutMaxSize = usbEndpointOut?.maxPacketSize ?: return false

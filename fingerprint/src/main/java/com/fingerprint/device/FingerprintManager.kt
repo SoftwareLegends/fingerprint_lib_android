@@ -11,6 +11,7 @@ interface FingerprintManager : DefaultLifecycleObserver {
     val captures: List<ImageBitmap>
     val bestCapture: ImageBitmap?
     val bestCaptureIndex: Int
+    val deviceInfo: FingerprintDeviceInfo
 
     fun connect()
     fun disconnect()

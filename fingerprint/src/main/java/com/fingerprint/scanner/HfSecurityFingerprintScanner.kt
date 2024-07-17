@@ -3,6 +3,7 @@ package com.fingerprint.scanner
 import android.hardware.usb.UsbDevice
 import android.util.Log
 import com.fingerprint.communication.UsbDeviceCommunicator
+import com.fingerprint.device.FingerprintDeviceInfo
 import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.Constants.DATA_PACKET
 import com.fingerprint.utils.UsbOperationHelper.CSW_LENGTH
@@ -30,10 +31,20 @@ internal class HfSecurityFingerprint(
 ) : FingerprintScanner {
     private var deviceType: Int = 0
     private var imageType: ScannedImageType = ScannedImageType.Normal
+    private var device: UsbDevice? = null
+    override val deviceInfo: FingerprintDeviceInfo
+        get() = FingerprintDeviceInfo(
+            vendorId = device?.vendorId,
+            productId = device?.productId,
+            model = if (deviceType in 1..2) "HF4000" else "Unknown",
+            product = device?.productName,
+            manufacturer = device?.manufacturerName
+        )
 
     override fun tunOffLed() = captureImage(imageType).returnUnit()
 
     override fun connect(usbDevice: UsbDevice): Boolean {
+        device = usbDevice
         if (usbDeviceCommunicator.openUsbDeviceConnection(usbDevice).not()) return false
 
         val passwordOptions = listOf(
