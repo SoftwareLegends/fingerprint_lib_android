@@ -10,7 +10,7 @@ sealed class FingerprintEvent(val message: String) {
     data object DeviceDetached : FingerprintEvent("USB Device Detached")
     data object Disconnected : FingerprintEvent("Fingerprint Disconnected")
     data object PlaceFinger : FingerprintEvent("Place Finger")
-    data class KeepFinger(val progress: Float) : FingerprintEvent("Keep Finger")
+    data object KeepFinger : FingerprintEvent("Keep Finger")
     data object CapturedSuccessfully : FingerprintEvent("Captured Successfully")
     data object CapturingFailed : FingerprintEvent("Capturing Failed")
     class NewImage(val bitmapArray: ByteArray) : FingerprintEvent("New Image")
