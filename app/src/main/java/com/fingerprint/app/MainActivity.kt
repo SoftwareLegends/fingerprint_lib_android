@@ -88,6 +88,7 @@ fun App(fingerprintManager: FingerprintManager) {
     val focusManager = LocalFocusManager.current
 
     LaunchedEffect(key1 = events) {
+        println("DEBUGGING -> Progress: ${fingerprintManager.progress}")
         when (events) {
             is FingerprintEvent.CapturedSuccessfully,
             is FingerprintEvent.ProcessCanceledTheFingerLifted -> {

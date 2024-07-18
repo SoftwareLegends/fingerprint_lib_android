@@ -37,6 +37,7 @@ internal class FingerprintManagerImpl(
     private val lifecycle: Lifecycle,
     private val fingerprintScanner: FingerprintScanner
 ) : FingerprintManager {
+    override var progress: Float = 0f
     override val eventsFlow = MutableStateFlow<FingerprintEvent>(FingerprintEvent.Idle)
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
     override var bestCapture: ImageBitmap? by mutableStateOf(null)
@@ -178,22 +179,23 @@ internal class FingerprintManagerImpl(
         isCanceled = false
         captureIndex = 0
         captureTimeout = 0
+        progress = 0f
         bestCaptureIndex = Int.MIN_VALUE
         bestCaptureValue = Int.MIN_VALUE
     }
 
     private suspend fun processCapture() {
-        val progress: Float = (captureIndex + 1) / captureCount.toFloat()
         val isFirstCapture = captureIndex == 0
         if (isFirstCapture)
             eventsFlow.emit(FingerprintEvent.PlaceFinger)
+        else
+            eventsFlow.emit(FingerprintEvent.KeepFinger)
 
         if (!captureImage()) return
 
         if (!getImageData()) return
 
-        if (isFirstCapture.not())
-            eventsFlow.emit(FingerprintEvent.KeepFinger(progress = progress))
+        progress = (captureIndex + 1) / captureCount.toFloat()
     }
 
     private suspend fun captureImage(): Boolean {
