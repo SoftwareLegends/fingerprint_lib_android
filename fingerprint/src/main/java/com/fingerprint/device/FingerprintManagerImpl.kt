@@ -184,16 +184,16 @@ internal class FingerprintManagerImpl(
 
     private suspend fun processCapture() {
         val progress: Float = (captureIndex + 1) / captureCount.toFloat()
-        eventsFlow.emit(
-            if (captureIndex == 0)
-                FingerprintEvent.PlaceFinger
-            else
-                FingerprintEvent.KeepFinger(progress = progress)
-        )
+        val isFirstCapture = captureIndex == 0
+        if (isFirstCapture)
+            eventsFlow.emit(FingerprintEvent.PlaceFinger)
 
         if (!captureImage()) return
 
         if (!getImageData()) return
+
+        if (isFirstCapture.not())
+            eventsFlow.emit(FingerprintEvent.KeepFinger(progress = progress))
     }
 
     private suspend fun captureImage(): Boolean {
