@@ -1,4 +1,4 @@
-package com.fingerprint.device
+package com.fingerprint.manager
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -24,11 +24,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
-import com.fingerprint.device.FingerprintManagerImpl.Companion.ACTION_USB_PERMISSION
+import com.fingerprint.manager.FingerprintManagerImpl.Companion.ACTION_USB_PERMISSION
 import com.fingerprint.scanner.FingerprintScanner
 import com.fingerprint.scanner.FutronictechFingerprintScanner
 import com.fingerprint.scanner.FutronictechFingerprintScanner.Companion.isFutronicDevice
-import com.fingerprint.scanner.HfSecurityFingerprint.Companion.isHfSecurityDevice
+import com.fingerprint.scanner.HfSecurityFingerprintScanner.Companion.isHfSecurityDevice
 import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.returnUnit
 import kotlinx.coroutines.CoroutineScope

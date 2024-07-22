@@ -1,4 +1,4 @@
-package com.fingerprint.communication
+package com.fingerprint.communicator
 
 import android.content.Context
 import android.hardware.usb.UsbConstants

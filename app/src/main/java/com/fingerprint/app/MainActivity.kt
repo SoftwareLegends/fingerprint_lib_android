@@ -48,8 +48,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.fingerprint.FingerprintInitializer
 import com.fingerprint.app.ui.theme.FingerprintHF4000Theme
-import com.fingerprint.device.FingerprintEvent
-import com.fingerprint.device.FingerprintManager
+import com.fingerprint.manager.FingerprintEvent
+import com.fingerprint.manager.FingerprintManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 

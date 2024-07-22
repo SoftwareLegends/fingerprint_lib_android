@@ -1,4 +1,4 @@
-package com.fingerprint.communication
+package com.fingerprint.communicator
 
 import android.hardware.usb.UsbDevice
 import com.fingerprint.utils.Constants.TIMEOUT

@@ -2,7 +2,7 @@ package com.fingerprint
 
 import android.content.Context
 import androidx.lifecycle.Lifecycle
-import com.fingerprint.device.FingerprintManager
+import com.fingerprint.manager.FingerprintManager
 import com.fingerprint.di.FingerprintModule
 import kotlinx.coroutines.CoroutineScope
 

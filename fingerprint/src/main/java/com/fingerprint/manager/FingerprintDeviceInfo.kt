@@ -1,4 +1,4 @@
-package com.fingerprint.device
+package com.fingerprint.manager
 
 import kotlinx.serialization.Serializable
 

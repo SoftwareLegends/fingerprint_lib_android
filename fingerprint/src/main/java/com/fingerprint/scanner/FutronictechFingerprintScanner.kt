@@ -5,9 +5,9 @@ package com.fingerprint.scanner
 import android.content.Context
 import android.hardware.usb.UsbDevice
 import android.util.Log
-import com.fingerprint.communication.DefaultUsbDeviceCommunicatorImpl
-import com.fingerprint.communication.UsbDeviceCommunicator
-import com.fingerprint.device.FingerprintDeviceInfo
+import com.fingerprint.communicator.DefaultUsbDeviceCommunicatorImpl
+import com.fingerprint.communicator.UsbDeviceCommunicator
+import com.fingerprint.manager.FingerprintDeviceInfo
 import com.fingerprint.utils.ScannedImageType
 import com.futronictech.Scanner
 import kotlinx.coroutines.delay
