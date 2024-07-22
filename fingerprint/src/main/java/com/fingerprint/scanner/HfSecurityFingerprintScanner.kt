@@ -100,7 +100,7 @@ internal class HfSecurityFingerprint(
         return bitmapArray
     }
 
-    override fun getImageData(): ByteArray? {
+    override suspend fun getImageData(): ByteArray? {
         val imageData = ByteArray(imageType.size)
         val result = if (imageType == ScannedImageType.Normal)
             getImageData(imageData)
@@ -436,5 +436,15 @@ internal class HfSecurityFingerprint(
         if (!sendPackage(GENERAL_SEND_PACKAGE_ADDRESS, sendData)) return false
         if (!receivePackage(receiveData, 64, 1000)) throw DeviceFailException()
         return verifyResponsePackage(receiveData)
+    }
+
+    companion object {
+        fun isHfSecurityDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {
+            1107 -> productId == 36869
+            8201 -> productId == 30264
+            8457 -> productId == 30264
+            1155 -> productId in listOf(22304, 22240)
+            else -> false
+        }
     }
 }

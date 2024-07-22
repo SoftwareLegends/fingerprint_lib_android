@@ -5,7 +5,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
@@ -19,9 +25,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
 import com.fingerprint.device.FingerprintManagerImpl.Companion.ACTION_USB_PERMISSION
-import com.fingerprint.device.FingerprintManagerImpl.Companion.isFutronicDevice
-import com.fingerprint.device.FingerprintManagerImpl.Companion.isHfSecurityDevice
 import com.fingerprint.scanner.FingerprintScanner
+import com.fingerprint.scanner.FutronictechFingerprintScanner
+import com.fingerprint.scanner.FutronictechFingerprintScanner.Companion.isFutronicDevice
+import com.fingerprint.scanner.HfSecurityFingerprint.Companion.isHfSecurityDevice
 import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.returnUnit
 import kotlinx.coroutines.CoroutineScope
@@ -35,8 +42,9 @@ internal class FingerprintManagerImpl(
     private val scope: CoroutineScope,
     private val context: Context,
     private val lifecycle: Lifecycle,
-    private val fingerprintScanner: FingerprintScanner
+    private val initializeFingerprintScanner: ()-> FingerprintScanner
 ) : FingerprintManager {
+    private var fingerprintScanner: FingerprintScanner = initializeFingerprintScanner()
     override var progress: Float = 0f
     override val eventsFlow = MutableStateFlow<FingerprintEvent>(FingerprintEvent.Idle)
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
@@ -57,6 +65,7 @@ internal class FingerprintManagerImpl(
     private val usbManager: UsbManager? = context.getSystemService()
 
     override fun connect() {
+        fingerprintScanner = initializeFingerprintScanner()
         registerReceiver()
         requestUsbPermission()
         if (isConnected) fingerprintScanner.tunOffLed()
@@ -163,7 +172,7 @@ internal class FingerprintManagerImpl(
         }
         eventsFlow.emit(FingerprintEvent.CapturedSuccessfully)
         bestCapture = captures[bestCaptureIndex]
-    }.onFailure { Log.e("DEBUGGING", it.toString()) }
+    }.onFailure { Log.e("DEBUGGING -> startProcessing() -> ", it.toString()) }
 
     private fun onFingerLiftDuringScanning() {
         scanningJob?.cancel()
@@ -220,7 +229,8 @@ internal class FingerprintManagerImpl(
             return false
         }
         return true
-    }.getOrDefault(false)
+    }.onFailure { Log.e("DEBUGGING -> getImageData() -> ", it.toString()) }
+        .getOrDefault(false)
 
     private fun findTheBestCapture(byteArray: ByteArray) {
         val newValue = byteArray.sum()
@@ -234,22 +244,6 @@ internal class FingerprintManagerImpl(
         const val MAX_SCAN_COUNT = 5
         const val SCAN_DELAY_IN_MILLIS: Long = 50
         const val ACTION_USB_PERMISSION = "com.fingerprint.USB_PERMISSION"
-
-        fun isHfSecurityDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {
-            1107 -> productId == 36869
-            8201 -> productId == 30264
-            8457 -> productId == 30264
-            1155 -> productId in listOf(22304, 22240)
-            else -> false
-        }
-
-        fun isFutronicDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {
-            2100 -> productId == 32
-            2392 -> productId == 775
-            8122 -> productId in listOf(18, 19, 39)
-            5265 -> productId in listOf(32, 37, 136, 144, 80, 96, 152, 32920, 39008)
-            else -> false
-        }
     }
 }
 
@@ -269,5 +263,37 @@ private fun Context.createPendingIntent(): PendingIntent {
 private val UsbManager?.supportedDevice: UsbDevice?
     get() = this?.deviceList?.values?.firstOrNull(UsbDevice::isSupportedDevice)
 
-private fun ByteArray.toBitmap(): ImageBitmap =
-    BitmapFactory.decodeByteArray(this, 0, size).asImageBitmap()
+private fun ByteArray.toBitmap(): ImageBitmap {
+    val config = Bitmap.Config.RGB_565
+    val bitmap: Bitmap = runCatching {
+        BitmapFactory.decodeByteArray(this, 0, size) ?: error("Bitmap is null")
+    }.getOrElse {
+        val imageWidth = FutronictechFingerprintScanner.IMAGE_WIDTH
+        val imageHeight = FutronictechFingerprintScanner.IMAGE_HEIGHT
+        val pixels = IntArray(imageWidth * imageHeight)
+
+        for (i in indices) {
+            val pixelValue = this[i].toInt() and 0xFF
+            val color = Color.rgb(pixelValue, pixelValue, pixelValue)
+            pixels[i] = color
+        }
+
+        Bitmap.createBitmap(pixels, imageWidth, imageHeight, config)
+    }
+
+    return bitmap.applyFilters(config).asImageBitmap()
+}
+
+private fun Bitmap.applyFilters(config: Bitmap.Config): Bitmap {
+    val contrast = 1.75f
+    val contrastMatrix = ColorMatrix().apply {
+        setScale(contrast, contrast, contrast, 1f)
+        setSaturation(0f)
+    }
+
+    val paint = Paint().apply { colorFilter = ColorMatrixColorFilter(contrastMatrix) }
+    val enhancedBitmap = Bitmap.createBitmap(width, height, config)
+    val canvas = Canvas(enhancedBitmap)
+    canvas.drawBitmap(this, 0f, 0f, paint)
+    return enhancedBitmap
+}
