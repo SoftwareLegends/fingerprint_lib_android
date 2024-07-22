@@ -18,10 +18,10 @@ internal class DefaultUsbDeviceCommunicatorImpl(
 ) : UsbDeviceCommunicator {
     private var endpointInMaxSize = 0
     private var endpointOutMaxSize = 0
-    private var usbEndpointIn: UsbEndpoint? = null
-    private var usbEndpointOut: UsbEndpoint? = null
-    private var usbInterface: UsbInterface? = null
-    private var usbConnection: UsbDeviceConnection? = null
+    var usbEndpointIn: UsbEndpoint? = null
+    var usbEndpointOut: UsbEndpoint? = null
+    var usbInterface: UsbInterface? = null
+    var usbConnection: UsbDeviceConnection? = null
     private var usbManager: UsbManager? = context.getSystemService()
 
     override fun closeUsbDevice(): Boolean {
