@@ -1,4 +1,4 @@
-package com.fingerprint.device
+package com.fingerprint.manager
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.DefaultLifecycleObserver

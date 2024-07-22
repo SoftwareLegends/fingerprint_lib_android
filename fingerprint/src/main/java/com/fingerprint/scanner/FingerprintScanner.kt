@@ -1,7 +1,7 @@
 package com.fingerprint.scanner
 
 import android.hardware.usb.UsbDevice
-import com.fingerprint.device.FingerprintDeviceInfo
+import com.fingerprint.manager.FingerprintDeviceInfo
 import com.fingerprint.utils.ScannedImageType
 
 

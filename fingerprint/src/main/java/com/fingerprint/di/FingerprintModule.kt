@@ -4,15 +4,15 @@ import android.content.Context
 import android.hardware.usb.UsbManager
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
-import com.fingerprint.communication.DefaultUsbDeviceCommunicatorImpl
-import com.fingerprint.communication.UsbDeviceCommunicator
-import com.fingerprint.device.FingerprintManager
-import com.fingerprint.device.FingerprintManagerImpl
+import com.fingerprint.communicator.DefaultUsbDeviceCommunicatorImpl
+import com.fingerprint.communicator.UsbDeviceCommunicator
+import com.fingerprint.manager.FingerprintManager
+import com.fingerprint.manager.FingerprintManagerImpl
 import com.fingerprint.scanner.FingerprintScanner
 import com.fingerprint.scanner.FutronictechFingerprintScanner
 import com.fingerprint.scanner.FutronictechFingerprintScanner.Companion.isFutronicDevice
-import com.fingerprint.scanner.HfSecurityFingerprint
-import com.fingerprint.scanner.HfSecurityFingerprint.Companion.isHfSecurityDevice
+import com.fingerprint.scanner.HfSecurityFingerprintScanner
+import com.fingerprint.scanner.HfSecurityFingerprintScanner.Companion.isHfSecurityDevice
 import kotlinx.coroutines.CoroutineScope
 
 
@@ -43,7 +43,7 @@ private fun Context.getSupportedFingerprintScanner(
     val usbManager = getSystemService<UsbManager>() ?: error("UsbManager not found")
 
     return when {
-        usbManager.isSupported(::isHfSecurityDevice) -> HfSecurityFingerprint(
+        usbManager.isSupported(::isHfSecurityDevice) -> HfSecurityFingerprintScanner(
             usbDeviceCommunicator = usbDeviceCommunicator
         )
 

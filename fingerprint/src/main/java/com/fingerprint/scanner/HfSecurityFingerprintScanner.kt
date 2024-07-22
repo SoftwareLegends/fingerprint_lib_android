@@ -2,8 +2,8 @@ package com.fingerprint.scanner
 
 import android.hardware.usb.UsbDevice
 import android.util.Log
-import com.fingerprint.communication.UsbDeviceCommunicator
-import com.fingerprint.device.FingerprintDeviceInfo
+import com.fingerprint.communicator.UsbDeviceCommunicator
+import com.fingerprint.manager.FingerprintDeviceInfo
 import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.Constants.DATA_PACKET
 import com.fingerprint.utils.UsbOperationHelper.CSW_LENGTH
@@ -26,7 +26,7 @@ import com.fingerprint.utils.DeviceFailException
 import com.fingerprint.utils.returnUnit
 
 
-internal class HfSecurityFingerprint(
+internal class HfSecurityFingerprintScanner(
     private val usbDeviceCommunicator: UsbDeviceCommunicator
 ) : FingerprintScanner {
     private var deviceType: Int = 0
