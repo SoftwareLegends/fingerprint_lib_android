@@ -42,16 +42,16 @@ internal class FingerprintManagerImpl(
     private val scope: CoroutineScope,
     private val context: Context,
     private val lifecycle: Lifecycle,
-    private val initializeFingerprintScanner: ()-> FingerprintScanner
+    private val initializeFingerprintScanner: () -> FingerprintScanner?
 ) : FingerprintManager {
-    private var fingerprintScanner: FingerprintScanner = initializeFingerprintScanner()
+    private var fingerprintScanner: FingerprintScanner? = initializeFingerprintScanner()
     override var progress: Float = 0f
     override val eventsFlow = MutableStateFlow<FingerprintEvent>(FingerprintEvent.Idle)
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
     override var bestCapture: ImageBitmap? by mutableStateOf(null)
     override var bestCaptureIndex: Int = Int.MIN_VALUE
     override val deviceInfo: FingerprintDeviceInfo
-        get() = fingerprintScanner.deviceInfo
+        get() = fingerprintScanner?.deviceInfo ?: FingerprintDeviceInfo.Unknown
 
     private var bestCaptureValue: Int = Int.MIN_VALUE
     private var imageType: ScannedImageType = ScannedImageType.Extra
@@ -68,14 +68,14 @@ internal class FingerprintManagerImpl(
         fingerprintScanner = initializeFingerprintScanner()
         registerReceiver()
         requestUsbPermission()
-        if (isConnected) fingerprintScanner.tunOffLed()
+        if (isConnected) fingerprintScanner?.tunOffLed()
     }
 
     override fun disconnect() {
         isCanceled = true
         isConnected = false
         unregisterReceiver()
-        fingerprintScanner.disconnect()
+        fingerprintScanner?.disconnect()
         eventsFlow.tryEmit(FingerprintEvent.Disconnected)
     }
 
@@ -111,6 +111,7 @@ internal class FingerprintManagerImpl(
 
     private fun requestUsbPermission() {
         usbManager.supportedDevice?.let { device ->
+            val fingerprintScanner = fingerprintScanner ?: return
             if (usbManager!!.hasPermission(device))
                 isConnected = fingerprintScanner.reconnect(device).apply {
                     eventsFlow.tryEmit(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
@@ -122,6 +123,7 @@ internal class FingerprintManagerImpl(
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = synchronized(this) {
+            fingerprintScanner = initializeFingerprintScanner()
             when (intent.action) {
                 ACTION_USB_PERMISSION -> {
                     val device: UsbDevice = (
@@ -141,6 +143,7 @@ internal class FingerprintManagerImpl(
                         false
                     )
 
+                    val fingerprintScanner = fingerprintScanner ?: return
                     if (isGranted)
                         isConnected = fingerprintScanner.reconnect(device).apply {
                             eventsFlow.tryEmit(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
@@ -208,6 +211,7 @@ internal class FingerprintManagerImpl(
     }
 
     private suspend fun captureImage(): Boolean {
+        val fingerprintScanner = fingerprintScanner ?: return false
         while (true) {
             delay(SCAN_DELAY_IN_MILLIS)
             if (fingerprintScanner.captureImage(imageType)) return true
@@ -217,6 +221,7 @@ internal class FingerprintManagerImpl(
     }
 
     private suspend fun getImageData(): Boolean = runCatching {
+        val fingerprintScanner = fingerprintScanner ?: return false
         val imageData = fingerprintScanner.getImageData()
         if (imageData != null) {
             val bitmapArray = fingerprintScanner.convertImageToBitmapArray(imageData)

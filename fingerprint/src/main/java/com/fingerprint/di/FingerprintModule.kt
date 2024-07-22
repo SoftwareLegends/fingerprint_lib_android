@@ -39,7 +39,7 @@ internal class FingerprintModule(
 
 private fun Context.getSupportedFingerprintScanner(
     usbDeviceCommunicator: UsbDeviceCommunicator
-): FingerprintScanner {
+): FingerprintScanner? {
     val usbManager = getSystemService<UsbManager>() ?: error("UsbManager not found")
 
     return when {
@@ -52,7 +52,7 @@ private fun Context.getSupportedFingerprintScanner(
             usbDeviceCommunicator = usbDeviceCommunicator
         )
 
-        else -> error("Unsupported fingerprint scanner")
+        else -> null
     }
 
 }

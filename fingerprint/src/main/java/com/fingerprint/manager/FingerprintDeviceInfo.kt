@@ -5,9 +5,13 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class FingerprintDeviceInfo(
-    val vendorId: Int?,
-    val productId: Int?,
-    val model: String?,
-    val product: String?,
-    val manufacturer: String?
-)
+    val vendorId: Int? = null,
+    val productId: Int? = null,
+    val model: String? = null,
+    val product: String? = null,
+    val manufacturer: String? = null
+) {
+    companion object {
+        val Unknown = FingerprintDeviceInfo()
+    }
+}
