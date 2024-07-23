@@ -83,7 +83,7 @@ internal class FutronictechFingerprintScanner(
                 scanner.closeDevice()
                 return imageData
             }
-            delay(150)
+            delay(SCAN_DELAY_IN_MILLIS)
         }
     }
 
@@ -110,38 +110,37 @@ internal class FutronictechFingerprintScanner(
                 usbDeviceCommunicator?.run {
                     if (
                         usbConnection?.bulkTransfer(
-                            usbEndpointIn,
-                            transferBuffer,
-                            if (useMaxEndPointSize)
+                            /* endpoint = */ usbEndpointIn,
+                            /* buffer = */ transferBuffer,
+                            /* length = */ if (useMaxEndPointSize)
                                 usbEndpointIn!!.maxPacketSize
                             else
                                 toReadSize,
-                            inTimeOut
-                        )
-                        == -1
+                            /* timeout = */ inTimeOut
+                        ) == -1
                     ) {
                         Log.e(LOG_TAG, String.format("Receive(3) %d bytes failed", toReadSize))
                         return false
                     }
-                    val real_read =
+                    val realRead =
                         if (toReadSize > usbEndpointIn!!.maxPacketSize)
                             usbEndpointIn!!.maxPacketSize
                         else
                             toReadSize
 
-                    if (copyPos + real_read > inData.size) {
+                    if (copyPos + realRead > inData.size) {
                         Log.e(
                             LOG_TAG,
                             String.format(
                                 "Small receive buffer. Need %d bytes",
-                                (copyPos + real_read) - inData.size
+                                (copyPos + realRead) - inData.size
                             )
                         )
                         return false
                     }
-                    System.arraycopy(transferBuffer, 0, inData, copyPos, real_read)
-                    toReadSize -= real_read
-                    copyPos += real_read
+                    System.arraycopy(transferBuffer, 0, inData, copyPos, realRead)
+                    toReadSize -= realRead
+                    copyPos += realRead
                 }
             }
             return true
@@ -151,7 +150,7 @@ internal class FutronictechFingerprintScanner(
     @JvmName("ValidateContext")
     fun validateContext(): Boolean {
         synchronized(this) {
-            return  usbDeviceCommunicator?.run {
+            return usbDeviceCommunicator?.run {
                 !(usbInterface == null || (usbConnection == null) || (usbEndpointIn == null) || (usbEndpointOut == null))
             } ?: false
         }
@@ -211,6 +210,7 @@ internal class FutronictechFingerprintScanner(
         const val IMAGE_SIZE = IMAGE_WIDTH * IMAGE_HEIGHT
         const val LOG_TAG: String = "DEBUGGING"
         const val TRANSFER_BUFFER_SIZE: Int = 4096
+        const val SCAN_DELAY_IN_MILLIS: Long = 150
 
         fun isFutronicDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {
             2100 -> productId == 32
