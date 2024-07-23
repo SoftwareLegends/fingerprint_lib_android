@@ -24,11 +24,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -42,8 +44,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.fingerprint.FingerprintInitializer
@@ -81,9 +85,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun App(fingerprintManager: FingerprintManager) {
+    val clipboardManager = LocalClipboardManager.current
     var status by remember { mutableStateOf("") }
+    var deviceInfo by remember { mutableStateOf("") }
     var scanCount by remember { mutableStateOf("5") }
     var finished by remember { mutableStateOf(true) }
+    var showInfo by remember { mutableStateOf(false) }
     val events by fingerprintManager.eventsFlow.collectAsState()
     val focusManager = LocalFocusManager.current
 
@@ -123,6 +130,29 @@ fun App(fingerprintManager: FingerprintManager) {
                 scanCount = scanCount,
                 fingerprintManager = fingerprintManager,
                 onFinishedChange = { finished = it })
+
+            if (showInfo)
+                AlertDialog(
+                    onDismissRequest = {},
+                    dismissButton = {},
+                    confirmButton = {
+                        TextButton(onClick = {
+                            clipboardManager.setText(AnnotatedString(deviceInfo))
+                            showInfo = false
+                        }) {
+                            Text(text = "Copy & Close")
+                        }
+                    },
+                    title = { Text(text = "Device Info") },
+                    text = { Text(text = deviceInfo) }
+                )
+
+            Button(onClick = {
+                deviceInfo = fingerprintManager.deviceInfo.toString()
+                showInfo = !showInfo
+            }) {
+                Text(text = "Get Info")
+            }
         }
     }
 }
