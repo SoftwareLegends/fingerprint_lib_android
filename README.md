@@ -179,7 +179,7 @@ interface FingerprintManager : DefaultLifecycleObserver {
     - [HF4000](https://hfsecurity.cn/hf4000-optical-android-fingerprint-scanner/) `(Tested and verified)` ✅
     - Other models may also be compatible.
 - **[Futronic](https://www.futronic-tech.com/)**
-    - [FS80H](https://www.futronic-tech.com/pro-detail.php?pro_id=1543) `(Work in progress)` ⏳
+    - [FS80H](https://www.futronic-tech.com/pro-detail.php?pro_id=1543) `(Under testing)` 🧪
 
 <br/>
 
