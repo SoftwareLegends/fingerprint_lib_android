@@ -13,6 +13,5 @@ internal interface FingerprintScanner {
     fun disconnect(): Boolean
     fun verifyPassword(password: ByteArray): Boolean = true
     fun captureImage(imageType: ScannedImageType): Boolean
-    suspend fun getImageData(): ByteArray?
-    fun convertImageToBitmapArray(imageData: ByteArray): ByteArray
+    suspend fun getImageBytes(): ByteArray?
 }

@@ -5,13 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import android.graphics.Paint
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
@@ -21,16 +14,15 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
 import com.fingerprint.manager.FingerprintManagerImpl.Companion.ACTION_USB_PERMISSION
 import com.fingerprint.scanner.FingerprintScanner
-import com.fingerprint.scanner.FutronictechFingerprintScanner
 import com.fingerprint.scanner.FutronictechFingerprintScanner.Companion.isFutronicDevice
 import com.fingerprint.scanner.HfSecurityFingerprintScanner.Companion.isHfSecurityDevice
 import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.returnUnit
+import com.fingerprint.utils.toImageBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -222,18 +214,17 @@ internal class FingerprintManagerImpl(
 
     private suspend fun getImageData(): Boolean = runCatching {
         val fingerprintScanner = fingerprintScanner ?: return false
-        val imageData = fingerprintScanner.getImageData()
-        if (imageData != null) {
-            val bitmapArray = fingerprintScanner.convertImageToBitmapArray(imageData)
+        val bitmapArray = fingerprintScanner.getImageBytes()
+        return if (bitmapArray != null) {
             findTheBestCapture(bitmapArray)
-            captures.add(bitmapArray.toBitmap())
+            captures.add(bitmapArray.toImageBitmap())
             eventsFlow.emit(FingerprintEvent.NewImage(bitmapArray))
             delay(SCAN_DELAY_IN_MILLIS)
+            true
         } else {
             eventsFlow.tryEmit(FingerprintEvent.CapturingFailed)
-            return false
+            false
         }
-        return true
     }.onFailure { Log.e("DEBUGGING -> getImageData() -> ", it.toString()) }
         .getOrDefault(false)
 
@@ -267,38 +258,3 @@ private fun Context.createPendingIntent(): PendingIntent {
 
 private val UsbManager?.supportedDevice: UsbDevice?
     get() = this?.deviceList?.values?.firstOrNull(UsbDevice::isSupportedDevice)
-
-private fun ByteArray.toBitmap(): ImageBitmap {
-    val config = Bitmap.Config.RGB_565
-    val bitmap: Bitmap = runCatching {
-        BitmapFactory.decodeByteArray(this, 0, size) ?: error("Bitmap is null")
-    }.getOrElse {
-        val imageWidth = FutronictechFingerprintScanner.IMAGE_WIDTH
-        val imageHeight = FutronictechFingerprintScanner.IMAGE_HEIGHT
-        val pixels = IntArray(imageWidth * imageHeight)
-
-        for (i in indices) {
-            val pixelValue = this[i].toInt() and 0xFF
-            val color = Color.rgb(pixelValue, pixelValue, pixelValue)
-            pixels[i] = color
-        }
-
-        Bitmap.createBitmap(pixels, imageWidth, imageHeight, config)
-    }
-
-    return bitmap.applyFilters(config).asImageBitmap()
-}
-
-private fun Bitmap.applyFilters(config: Bitmap.Config): Bitmap {
-    val contrast = 1.75f
-    val contrastMatrix = ColorMatrix().apply {
-        setScale(contrast, contrast, contrast, 1f)
-        setSaturation(0f)
-    }
-
-    val paint = Paint().apply { colorFilter = ColorMatrixColorFilter(contrastMatrix) }
-    val enhancedBitmap = Bitmap.createBitmap(width, height, config)
-    val canvas = Canvas(enhancedBitmap)
-    canvas.drawBitmap(this, 0f, 0f, paint)
-    return enhancedBitmap
-}
