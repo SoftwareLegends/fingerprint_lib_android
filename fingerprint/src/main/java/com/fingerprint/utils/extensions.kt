@@ -84,3 +84,11 @@ fun Bitmap.applyFilters(config: Bitmap.Config): Bitmap {
     canvas.drawBitmap(this, 0f, 0f, paint)
     return enhancedBitmap
 }
+
+internal fun ByteArray.insertAt(value: Int, index: Int): Int {
+    this[index] = value.toByte()
+    this[index + 1] = (value shr 8).toByte()
+    this[index + 2] = (value shr 16).toByte()
+    this[index + 3] = (value shr 24).toByte()
+    return index + 4
+}

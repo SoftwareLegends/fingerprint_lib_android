@@ -12,6 +12,7 @@ import com.fingerprint.manager.FingerprintDeviceInfo
 import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.applyFilters
 import com.fingerprint.utils.convertImageDataToBitmapArray
+import com.fingerprint.utils.insertAt
 import com.futronictech.Scanner
 
 
@@ -214,12 +215,4 @@ internal class FutronictechFingerprintScanner(
             else -> false
         }
     }
-}
-
-fun ByteArray.insertAt(value: Int, index: Int): Int {
-    this[index] = value.toByte()
-    this[index + 1] = (value shr 8).toByte()
-    this[index + 2] = (value shr 16).toByte()
-    this[index + 3] = (value shr 24).toByte()
-    return index + 4
 }
