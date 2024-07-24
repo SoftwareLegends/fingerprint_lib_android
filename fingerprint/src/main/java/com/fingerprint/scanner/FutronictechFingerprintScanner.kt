@@ -3,12 +3,15 @@
 package com.fingerprint.scanner
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.hardware.usb.UsbDevice
 import android.util.Log
 import com.fingerprint.communicator.DefaultUsbDeviceCommunicatorImpl
 import com.fingerprint.communicator.UsbDeviceCommunicator
 import com.fingerprint.manager.FingerprintDeviceInfo
 import com.fingerprint.utils.ScannedImageType
+import com.fingerprint.utils.applyFilters
+import com.fingerprint.utils.convertImageDataToBitmapArray
 import com.futronictech.Scanner
 import kotlinx.coroutines.delay
 
@@ -73,15 +76,18 @@ internal class FutronictechFingerprintScanner(
         return scanner.setOptions(mask, flag)
     }
 
-    override fun convertImageToBitmapArray(imageData: ByteArray): ByteArray = imageData
-
-    override suspend fun getImageData(): ByteArray {
+    override suspend fun getImageBytes(): ByteArray {
         val imageData = ByteArray(IMAGE_SIZE)
         while (true) {
             val result = scanner.getFrame(imageData)
             if (result) {
                 scanner.closeDevice()
-                return imageData
+                return imageData.convertImageDataToBitmapArray(
+                    height = IMAGE_HEIGHT,
+                    width = IMAGE_WIDTH,
+                    config = Bitmap.Config.ARGB_8888,
+                    applyFilters = Bitmap::applyFilters
+                )
             }
             delay(SCAN_DELAY_IN_MILLIS)
         }

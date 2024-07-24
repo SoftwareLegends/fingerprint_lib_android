@@ -1,28 +1,29 @@
 package com.fingerprint.scanner
 
+import android.graphics.Bitmap
 import android.hardware.usb.UsbDevice
 import android.util.Log
 import com.fingerprint.communicator.UsbDeviceCommunicator
 import com.fingerprint.manager.FingerprintDeviceInfo
-import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.Constants.DATA_PACKET
+import com.fingerprint.utils.Constants.END_DATA_PACKET
+import com.fingerprint.utils.Constants.FILL_PACKAGE_COMMAND
+import com.fingerprint.utils.Constants.GENERAL_SEND_PACKAGE_ADDRESS
+import com.fingerprint.utils.Constants.MAX_PACKAGE_SIZE
+import com.fingerprint.utils.Constants.RESPONSE_PACKET
+import com.fingerprint.utils.Constants.RETURN_FAIL
+import com.fingerprint.utils.Constants.TIMEOUT
+import com.fingerprint.utils.Constants.VERIFY_PASSWORD_COMMAND
+import com.fingerprint.utils.DeviceFailException
+import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.UsbOperationHelper.CSW_LENGTH
 import com.fingerprint.utils.UsbOperationHelper.CSW_SIGNATURE_INDEX
 import com.fingerprint.utils.UsbOperationHelper.CSW_SIGNATURE_OK
 import com.fingerprint.utils.UsbOperationHelper.CSW_STATUS_INDEX
 import com.fingerprint.utils.UsbOperationHelper.EMPTY_BYTE
 import com.fingerprint.utils.UsbOperationHelper.createCommandBlockWrapper
-import com.fingerprint.utils.UsbOperationHelper.intToByteArray
-import com.fingerprint.utils.Constants.BMP_DESTINATION_OFFSET
-import com.fingerprint.utils.Constants.END_DATA_PACKET
-import com.fingerprint.utils.Constants.FILL_PACKAGE_COMMAND
-import com.fingerprint.utils.Constants.MAX_PACKAGE_SIZE
-import com.fingerprint.utils.Constants.RESPONSE_PACKET
-import com.fingerprint.utils.Constants.RETURN_FAIL
-import com.fingerprint.utils.Constants.TIMEOUT
-import com.fingerprint.utils.Constants.GENERAL_SEND_PACKAGE_ADDRESS
-import com.fingerprint.utils.Constants.VERIFY_PASSWORD_COMMAND
-import com.fingerprint.utils.DeviceFailException
+import com.fingerprint.utils.applyFilters
+import com.fingerprint.utils.convertImageDataToBitmapArray
 import com.fingerprint.utils.returnUnit
 
 
@@ -68,45 +69,18 @@ internal class HfSecurityFingerprintScanner(
 
     override fun disconnect(): Boolean = usbDeviceCommunicator.closeUsbDevice()
 
-    override fun convertImageToBitmapArray(imageData: ByteArray): ByteArray {
-        val bmpHeader: Byte = 14
-        val dibHeader: Byte = 40
-        val headerSize: Byte = (bmpHeader + dibHeader).toByte()
-        val bitmapArray = ByteArray(imageType.size).apply {
-            this[0] = 'B'.code.toByte()
-            this[1] = 'M'.code.toByte()
-            this[10] = headerSize
-            this[11] = 4
-            this[14] = dibHeader
-            this[26] = 1
-            this[28] = 8
-        }
-
-        val imageWidthBytes = intToByteArray(imageType.imageWidth)
-        val imageHeightBytes = intToByteArray(imageType.imageHeight)
-
-        System.arraycopy(imageWidthBytes, 0, bitmapArray, 18, 4)
-        System.arraycopy(imageHeightBytes, 0, bitmapArray, 22, 4)
-
-        for ((j, i) in (headerSize until BMP_DESTINATION_OFFSET step 4).withIndex()) {
-            bitmapArray[i] = j.toByte() // BLUE
-            bitmapArray[i + 1] = j.toByte() // GREEN
-            bitmapArray[i + 2] = j.toByte() // RED
-        }
-
-        // Copying buffer
-        for (i in 0 until (imageType.size - BMP_DESTINATION_OFFSET))
-            bitmapArray[BMP_DESTINATION_OFFSET + i] = imageData[i]
-        return bitmapArray
-    }
-
-    override suspend fun getImageData(): ByteArray? {
+    override suspend fun getImageBytes(): ByteArray? {
         val imageData = ByteArray(imageType.size)
         val result = if (imageType == ScannedImageType.Normal)
             getImageData(imageData)
         else
             getImageDataExtra(imageData)
-        return if (result) imageData else null
+        return if (result) imageData.convertImageDataToBitmapArray(
+            height = imageType.imageHeight,
+            width = imageType.imageWidth,
+            config = Bitmap.Config.ARGB_8888,
+            applyFilters = Bitmap::applyFilters
+        ) else null
     }
 
     override fun captureImage(imageType: ScannedImageType): Boolean = runCatching {
