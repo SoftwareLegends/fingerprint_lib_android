@@ -13,15 +13,15 @@ import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.applyFilters
 import com.fingerprint.utils.convertImageDataToBitmapArray
 import com.futronictech.Scanner
-import kotlinx.coroutines.delay
 
 
 internal class FutronictechFingerprintScanner(
     private val context: Context,
     usbDeviceCommunicator: UsbDeviceCommunicator
 ) : FingerprintScanner {
-    private lateinit var scanner: Scanner
+    private var scanner: Scanner? = null
     private var device: UsbDevice? = null
+    private var imageData: ByteArray? = ByteArray(IMAGE_SIZE)
     private val usbDeviceCommunicator = usbDeviceCommunicator as? DefaultUsbDeviceCommunicatorImpl
     private var transferBuffer: ByteArray = ByteArray(TRANSFER_BUFFER_SIZE)
     override val deviceInfo: FingerprintDeviceInfo
@@ -32,7 +32,6 @@ internal class FutronictechFingerprintScanner(
             product = device?.productName,
             manufacturer = device?.manufacturerName
         )
-
 
     override fun connect(usbDevice: UsbDevice): Boolean {
         usbDeviceCommunicator?.openUsbDeviceConnection(usbDevice)
@@ -45,52 +44,41 @@ internal class FutronictechFingerprintScanner(
         return connect(usbDevice)
     }
 
-    override fun disconnect() =
-        synchronized(this) {
-            usbDeviceCommunicator?.usbConnection?.run {
-                releaseInterface(usbDeviceCommunicator.usbInterface)
-                close()
-            } != null
-        }
+    override fun disconnect() = synchronized(this) {
+        scanner?.closeDevice()
+        scanner = null
+        usbDeviceCommunicator?.usbConnection?.run {
+            releaseInterface(usbDeviceCommunicator.usbInterface)
+            close()
+        } != null
+    }
+
+    override suspend fun getImageBytes(): ByteArray? {
+        imageData = imageData?.convertImageDataToBitmapArray(
+            height = IMAGE_HEIGHT,
+            width = IMAGE_WIDTH,
+            config = Bitmap.Config.ARGB_8888,
+            applyFilters = Bitmap::applyFilters
+        )
+        return imageData
+    }
 
     override fun captureImage(imageType: ScannedImageType): Boolean {
-        scanner = Scanner(context.cacheDir)
-        val scannerInitialized = initializeScanner()
-        if (scanner.isSyncDirInitialized.not())
-            return false
-
-        if (initializeScannerOptions().not() || scannerInitialized.not())
-            return false
-        return true
+        if (scanner == null) initializeScanner()
+        imageData = ByteArray(IMAGE_SIZE)
+        return scanner?.getFrame(imageData) ?: false
     }
 
     private fun initializeScanner(): Boolean {
-        val openDeviceSuccess = scanner.openDeviceOnInterfaceUsbHost(this)
-        return !(!openDeviceSuccess || !scanner.getImageSize())
-    }
-
-    private fun initializeScannerOptions(): Boolean {
         val invertImage = true
+        scanner = Scanner(context.cacheDir).apply {
+            if (isSyncDirInitialized.not())
+                return false
+            openDeviceOnInterfaceUsbHost(this@FutronictechFingerprintScanner)
+        }
         val mask = Scanner.FTR_OPTIONS_DETECT_FAKE_FINGER or Scanner.FTR_OPTIONS_INVERT_IMAGE
         val flag = (if (invertImage) Scanner.FTR_OPTIONS_INVERT_IMAGE else 0)
-        return scanner.setOptions(mask, flag)
-    }
-
-    override suspend fun getImageBytes(): ByteArray {
-        val imageData = ByteArray(IMAGE_SIZE)
-        while (true) {
-            val result = scanner.getFrame(imageData)
-            if (result) {
-                scanner.closeDevice()
-                return imageData.convertImageDataToBitmapArray(
-                    height = IMAGE_HEIGHT,
-                    width = IMAGE_WIDTH,
-                    config = Bitmap.Config.ARGB_8888,
-                    applyFilters = Bitmap::applyFilters
-                )
-            }
-            delay(SCAN_DELAY_IN_MILLIS)
-        }
+        return scanner?.setOptions(mask, flag) ?: false
     }
 
     @JvmName("DataExchange")
