@@ -31,6 +31,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -67,4 +68,19 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+}
+
+task<Copy>("moveReleaseApk") {
+    val buildDir = layout.projectDirectory.dir("release")
+    val destinationDir = layout.projectDirectory.dir("../sample")
+
+    from(buildDir) {
+        include("*.apk")
+        rename("(.*).apk", "sample.apk")
+    }
+    into(destinationDir)
+    includeEmptyDirs = false
+
+    dependsOn("assembleRelease")
+    shouldRunAfter("assembleRelease")
 }
