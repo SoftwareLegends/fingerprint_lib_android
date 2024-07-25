@@ -1,39 +1,51 @@
 package com.fingerprint.scanner
 
+import android.graphics.Bitmap
 import android.hardware.usb.UsbDevice
 import android.util.Log
-import com.fingerprint.communication.UsbDeviceCommunicator
-import com.fingerprint.utils.ScannedImageType
+import com.fingerprint.communicator.UsbDeviceCommunicator
+import com.fingerprint.manager.FingerprintDeviceInfo
 import com.fingerprint.utils.Constants.DATA_PACKET
+import com.fingerprint.utils.Constants.END_DATA_PACKET
+import com.fingerprint.utils.Constants.FILL_PACKAGE_COMMAND
+import com.fingerprint.utils.Constants.GENERAL_SEND_PACKAGE_ADDRESS
+import com.fingerprint.utils.Constants.MAX_PACKAGE_SIZE
+import com.fingerprint.utils.Constants.RESPONSE_PACKET
+import com.fingerprint.utils.Constants.RETURN_FAIL
+import com.fingerprint.utils.Constants.TIMEOUT
+import com.fingerprint.utils.Constants.VERIFY_PASSWORD_COMMAND
+import com.fingerprint.utils.DeviceFailException
+import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.UsbOperationHelper.CSW_LENGTH
 import com.fingerprint.utils.UsbOperationHelper.CSW_SIGNATURE_INDEX
 import com.fingerprint.utils.UsbOperationHelper.CSW_SIGNATURE_OK
 import com.fingerprint.utils.UsbOperationHelper.CSW_STATUS_INDEX
 import com.fingerprint.utils.UsbOperationHelper.EMPTY_BYTE
 import com.fingerprint.utils.UsbOperationHelper.createCommandBlockWrapper
-import com.fingerprint.utils.UsbOperationHelper.intToByteArray
-import com.fingerprint.utils.Constants.BMP_DESTINATION_OFFSET
-import com.fingerprint.utils.Constants.END_DATA_PACKET
-import com.fingerprint.utils.Constants.FILL_PACKAGE_COMMAND
-import com.fingerprint.utils.Constants.MAX_PACKAGE_SIZE
-import com.fingerprint.utils.Constants.RESPONSE_PACKET
-import com.fingerprint.utils.Constants.RETURN_FAIL
-import com.fingerprint.utils.Constants.TIMEOUT
-import com.fingerprint.utils.Constants.GENERAL_SEND_PACKAGE_ADDRESS
-import com.fingerprint.utils.Constants.VERIFY_PASSWORD_COMMAND
-import com.fingerprint.utils.DeviceFailException
+import com.fingerprint.utils.applyFilters
+import com.fingerprint.utils.convertImageDataToBitmapArray
 import com.fingerprint.utils.returnUnit
 
 
-internal class HfSecurityFingerprint(
+internal class HfSecurityFingerprintScanner(
     private val usbDeviceCommunicator: UsbDeviceCommunicator
 ) : FingerprintScanner {
     private var deviceType: Int = 0
     private var imageType: ScannedImageType = ScannedImageType.Normal
+    private var device: UsbDevice? = null
+    override val deviceInfo: FingerprintDeviceInfo
+        get() = FingerprintDeviceInfo(
+            vendorId = device?.vendorId,
+            productId = device?.productId,
+            model = if (deviceType in 1..2) "HF4000" else "Unknown",
+            product = device?.productName,
+            manufacturer = device?.manufacturerName
+        )
 
-    override fun tunOffLed() = captureImage(imageType).returnUnit()
+    override fun turnOffLed() = captureImage(imageType).returnUnit()
 
     override fun connect(usbDevice: UsbDevice): Boolean {
+        device = usbDevice
         if (usbDeviceCommunicator.openUsbDeviceConnection(usbDevice).not()) return false
 
         val passwordOptions = listOf(
@@ -57,45 +69,18 @@ internal class HfSecurityFingerprint(
 
     override fun disconnect(): Boolean = usbDeviceCommunicator.closeUsbDevice()
 
-    override fun convertImageToBitmapArray(imageData: ByteArray): ByteArray {
-        val bmpHeader: Byte = 14
-        val dibHeader: Byte = 40
-        val headerSize: Byte = (bmpHeader + dibHeader).toByte()
-        val bitmapArray = ByteArray(imageType.size).apply {
-            this[0] = 'B'.code.toByte()
-            this[1] = 'M'.code.toByte()
-            this[10] = headerSize
-            this[11] = 4
-            this[14] = dibHeader
-            this[26] = 1
-            this[28] = 8
-        }
-
-        val imageWidthBytes = intToByteArray(imageType.imageWidth)
-        val imageHeightBytes = intToByteArray(imageType.imageHeight)
-
-        System.arraycopy(imageWidthBytes, 0, bitmapArray, 18, 4)
-        System.arraycopy(imageHeightBytes, 0, bitmapArray, 22, 4)
-
-        for ((j, i) in (headerSize until BMP_DESTINATION_OFFSET step 4).withIndex()) {
-            bitmapArray[i] = j.toByte() // BLUE
-            bitmapArray[i + 1] = j.toByte() // GREEN
-            bitmapArray[i + 2] = j.toByte() // RED
-        }
-
-        // Copying buffer
-        for (i in 0 until (imageType.size - BMP_DESTINATION_OFFSET))
-            bitmapArray[BMP_DESTINATION_OFFSET + i] = imageData[i]
-        return bitmapArray
-    }
-
-    override fun getImageData(): ByteArray? {
+    override suspend fun getImageBytes(): ByteArray? {
         val imageData = ByteArray(imageType.size)
-        val result = if (imageType == ScannedImageType.Normal)
+        val isSuccess = if (imageType == ScannedImageType.Normal)
             getImageData(imageData)
         else
             getImageDataExtra(imageData)
-        return if (result) imageData else null
+        return if (isSuccess) imageData.convertImageDataToBitmapArray(
+            height = imageType.imageHeight,
+            width = imageType.imageWidth,
+            config = Bitmap.Config.ARGB_8888,
+            applyFilters = Bitmap::applyFilters
+        ) else null
     }
 
     override fun captureImage(imageType: ScannedImageType): Boolean = runCatching {
@@ -425,5 +410,15 @@ internal class HfSecurityFingerprint(
         if (!sendPackage(GENERAL_SEND_PACKAGE_ADDRESS, sendData)) return false
         if (!receivePackage(receiveData, 64, 1000)) throw DeviceFailException()
         return verifyResponsePackage(receiveData)
+    }
+
+    companion object {
+        fun isHfSecurityDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {
+            1107 -> productId == 36869
+            8201 -> productId == 30264
+            8457 -> productId == 30264
+            1155 -> productId in listOf(22304, 22240)
+            else -> false
+        }
     }
 }
