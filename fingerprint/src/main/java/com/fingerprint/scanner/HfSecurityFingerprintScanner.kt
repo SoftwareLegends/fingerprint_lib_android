@@ -42,7 +42,7 @@ internal class HfSecurityFingerprintScanner(
             manufacturer = device?.manufacturerName
         )
 
-    override fun tunOffLed() = captureImage(imageType).returnUnit()
+    override fun turnOffLed() = captureImage(imageType).returnUnit()
 
     override fun connect(usbDevice: UsbDevice): Boolean {
         device = usbDevice
@@ -71,11 +71,11 @@ internal class HfSecurityFingerprintScanner(
 
     override suspend fun getImageBytes(): ByteArray? {
         val imageData = ByteArray(imageType.size)
-        val result = if (imageType == ScannedImageType.Normal)
+        val isSuccess = if (imageType == ScannedImageType.Normal)
             getImageData(imageData)
         else
             getImageDataExtra(imageData)
-        return if (result) imageData.convertImageDataToBitmapArray(
+        return if (isSuccess) imageData.convertImageDataToBitmapArray(
             height = imageType.imageHeight,
             width = imageType.imageWidth,
             config = Bitmap.Config.ARGB_8888,

@@ -195,10 +195,7 @@ internal class FingerprintManagerImpl(
         else
             eventsFlow.emit(FingerprintEvent.KeepFinger)
 
-        if (!captureImage()) return
-
-        if (!getImageData()) return
-
+        if (!captureImage() && !getImageData()) return
         progress = (captureIndex + 1) / captureCount.toFloat()
     }
 
