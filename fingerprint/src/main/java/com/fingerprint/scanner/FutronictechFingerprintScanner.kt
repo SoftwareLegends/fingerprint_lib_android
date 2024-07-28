@@ -46,8 +46,6 @@ internal class FutronictechFingerprintScanner(
     }
 
     override fun disconnect() = synchronized(this) {
-        scanner?.closeDevice()
-        scanner = null
         usbDeviceCommunicator?.usbConnection?.run {
             releaseInterface(usbDeviceCommunicator.usbInterface)
             close()
@@ -72,13 +70,13 @@ internal class FutronictechFingerprintScanner(
 
     private fun initializeScanner(): Boolean {
         val invertImage = true
+        val mask = Scanner.FTR_OPTIONS_DETECT_FAKE_FINGER or Scanner.FTR_OPTIONS_INVERT_IMAGE
+        val flag = (if (invertImage) Scanner.FTR_OPTIONS_INVERT_IMAGE else 0)
         scanner = Scanner(context.cacheDir).apply {
             if (isSyncDirInitialized.not())
                 return false
             openDeviceOnInterfaceUsbHost(this@FutronictechFingerprintScanner)
         }
-        val mask = Scanner.FTR_OPTIONS_DETECT_FAKE_FINGER or Scanner.FTR_OPTIONS_INVERT_IMAGE
-        val flag = (if (invertImage) Scanner.FTR_OPTIONS_INVERT_IMAGE else 0)
         return scanner?.setOptions(mask, flag) ?: false
     }
 
