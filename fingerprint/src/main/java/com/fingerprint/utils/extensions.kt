@@ -13,12 +13,30 @@ import com.fingerprint.utils.UsbOperationHelper.intToByteArray
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
 
 
 @Suppress("UnusedReceiverParameter")
 fun Any.returnUnit() = Unit
 
 inline fun <reified T> T.toJson(): String = Json.encodeToString(this)
+
+fun Bitmap.toRawByteArray(): ByteArray {
+    val size = rowBytes * height
+    val buffer = ByteBuffer.allocate(size)
+    this.copyPixelsToBuffer(buffer)
+    return buffer.array()
+}
+
+fun ByteArray.toRawBitmap(width: Int, height: Int, config: Bitmap.Config = Bitmap.Config.ARGB_8888): Bitmap {
+    val buffer = ByteBuffer.wrap(this)
+    val bitmap = Bitmap.createBitmap(width, height, config)
+    bitmap.copyPixelsFromBuffer(buffer)
+    return bitmap
+}
+
+fun ByteArray.toRawImageBitmap(width: Int, height: Int, config: Bitmap.Config = Bitmap.Config.ARGB_8888): ImageBitmap =
+    toRawBitmap(width, height, config).asImageBitmap()
 
 fun Bitmap.toByteArray(): ByteArray = ByteArrayOutputStream().apply {
     compress(Bitmap.CompressFormat.PNG, 100, this)
@@ -72,12 +90,7 @@ internal fun ByteArray.convertImageDataToBitmapArray(
 }
 
 fun Bitmap.applyFilters(config: Bitmap.Config): Bitmap {
-    val contrast = 1.75f
-    val contrastMatrix = ColorMatrix().apply {
-        setScale(contrast, contrast, contrast, 1f)
-        setSaturation(0f)
-    }
-
+    val contrastMatrix = ColorMatrix().apply { setSaturation(0f) }
     val paint = Paint().apply { colorFilter = ColorMatrixColorFilter(contrastMatrix) }
     val enhancedBitmap = Bitmap.createBitmap(width, height, config)
     val canvas = Canvas(enhancedBitmap)

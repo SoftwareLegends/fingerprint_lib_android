@@ -17,6 +17,7 @@ interface FingerprintManager : DefaultLifecycleObserver {
     fun connect()
     fun disconnect()
     fun scan(count: Int): Boolean
+    fun improveTheBestCapture(isApplyFilters: Boolean = false, isBlue: Boolean = false)
 
     override fun onResume(owner: LifecycleOwner) = connect()
 
