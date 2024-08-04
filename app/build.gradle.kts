@@ -3,6 +3,13 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.google.appdistribution)
+}
+
+object Release {
+    val versionCode = 9
+    val versionName = "1.0.${versionCode - 1}"
 }
 
 android {
@@ -13,8 +20,8 @@ android {
         applicationId = "com.fingerprint.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = Release.versionCode
+        versionName = Release.versionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -29,6 +36,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            val distributionDir = "$rootDir/distribution"
+            firebaseAppDistribution {
+                groups = "all"
+                artifactType = "APK"
+                releaseNotesFile = "$distributionDir/release-notes.txt"
+                serviceCredentialsFile = "$distributionDir/firebase-distribution-key.json"
+            }
         }
     }
 
@@ -70,6 +85,14 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+}
+
+task("uploadReleaseToAppDistribution") {
+    group = "distribution"
+    description = "Assembles the release build and uploads it to app distribution"
+    dependsOn("clean")
+    dependsOn("assembleRelease")
+    dependsOn("appDistributionUploadRelease")
 }
 
 task<Copy>("moveReleaseApk") {

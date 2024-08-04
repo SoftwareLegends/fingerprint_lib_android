@@ -15,3 +15,5 @@
 local.properties
 *.json
 *.dm
+.kotlin
+distribution
