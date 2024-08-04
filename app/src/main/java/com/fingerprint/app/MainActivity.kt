@@ -63,7 +63,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fingerprint.FingerprintInitializer
-import com.fingerprint.app.ui.theme.FingerprintHF4000Theme
+import com.fingerprint.app.ui.theme.FingerprintTheme
 import com.fingerprint.manager.FingerprintEvent
 import com.fingerprint.manager.FingerprintManager
 import kotlinx.coroutines.CoroutineScope
@@ -83,7 +83,7 @@ class MainActivity : ComponentActivity() {
         initializeFingerprintManager()
 
         setContent {
-            FingerprintHF4000Theme {
+            FingerprintTheme {
                 App(fingerprintManager)
             }
         }
