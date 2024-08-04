@@ -17,13 +17,15 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
-import com.fingerprint.manager.FingerprintManagerImpl.Companion.ACTION_USB_PERMISSION
 import com.fingerprint.scanner.FingerprintScanner
 import com.fingerprint.scanner.FutronictechFingerprintScanner
 import com.fingerprint.scanner.FutronictechFingerprintScanner.Companion.isFutronicDevice
 import com.fingerprint.scanner.HfSecurityFingerprintScanner
 import com.fingerprint.scanner.HfSecurityFingerprintScanner.Companion.isHfSecurityDevice
+import com.fingerprint.utils.Constants.ACTION_USB_PERMISSION
+import com.fingerprint.utils.Constants.DEFAULT_BRIGHTNESS_THRESHOLD
 import com.fingerprint.utils.ScannedImageType
+import com.fingerprint.utils.getPixelBrightness
 import com.fingerprint.utils.returnUnit
 import com.fingerprint.utils.toImageBitmap
 import com.fingerprint.utils.toRawByteArray
@@ -233,10 +235,20 @@ internal class FingerprintManagerImpl(
     private suspend fun captureImage(): Boolean {
         val fingerprintScanner = fingerprintScanner ?: return false
         while (true) {
+            val isFirstCapture = (captureIndex == 0)
             delay(SCAN_DELAY_IN_MILLIS)
-            if (fingerprintScanner.captureImage(imageType)) return true
-            if (captureIndex in 1..captureCount) onFingerLiftDuringScanning()
-            if (isCanceled) return false
+
+            when {
+                isCanceled -> return false
+                fingerprintScanner.captureImage(imageType) -> return true
+                isFirstCapture.not() -> onFingerLiftDuringScanning()
+                fingerprintScanner.isCleanRequired() -> {
+                    eventsFlow.emit(FingerprintEvent.CleanTheFingerprint)
+                    continue
+                }
+
+                else -> eventsFlow.emit(FingerprintEvent.KeepFinger)
+            }
         }
     }
 
@@ -286,8 +298,6 @@ internal class FingerprintManagerImpl(
     companion object {
         const val MAX_SCAN_COUNT = 5
         const val SCAN_DELAY_IN_MILLIS: Long = 50
-        const val DEFAULT_BRIGHTNESS_THRESHOLD = 128f
-        const val ACTION_USB_PERMISSION = "com.fingerprint.USB_PERMISSION"
     }
 }
 
@@ -306,14 +316,6 @@ private fun Context.createPendingIntent(): PendingIntent {
 
 private val UsbManager?.supportedDevice: UsbDevice?
     get() = this?.deviceList?.values?.firstOrNull(UsbDevice::isSupportedDevice)
-
-private fun ByteArray.getPixelBrightness(position: Int): Float = runCatching {
-    val red = (this[position + 0].toInt() shr 16) and 0xFF
-    val green = (this[position + 1].toInt() shr 8) and 0xFF
-    val blue = this[position + 2].toInt() and 0xFF
-    val brightness = 0.299f * red + 0.587f * green + 0.114f * blue
-    return brightness
-}.getOrDefault(0f)
 
 private fun ByteArray.writeColor(
     position: Int,

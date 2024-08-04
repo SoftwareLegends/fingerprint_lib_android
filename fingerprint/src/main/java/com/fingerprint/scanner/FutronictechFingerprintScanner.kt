@@ -12,6 +12,7 @@ import com.fingerprint.manager.FingerprintDeviceInfo
 import com.fingerprint.utils.ScannedImageType
 import com.fingerprint.utils.applyFilters
 import com.fingerprint.utils.convertImageDataToBitmapArray
+import com.fingerprint.utils.greaterThan
 import com.fingerprint.utils.insertAt
 import com.futronictech.Scanner
 
@@ -61,6 +62,9 @@ internal class FutronictechFingerprintScanner(
         )
         return imageData
     }
+
+    override suspend fun isCleanRequired(): Boolean =
+        getBrightness() greaterThan CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD
 
     override fun captureImage(imageType: ScannedImageType): Boolean {
         if (scanner == null) initializeScanner()
@@ -204,6 +208,7 @@ internal class FutronictechFingerprintScanner(
         const val LOG_TAG: String = "DEBUGGING"
         const val TRANSFER_BUFFER_SIZE: Int = 4096
         const val SCAN_DELAY_IN_MILLIS: Long = 150
+        private const val CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD = 13_000f
 
         fun isFutronicDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {
             2100 -> productId == 32
