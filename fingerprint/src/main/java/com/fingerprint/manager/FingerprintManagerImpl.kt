@@ -76,12 +76,12 @@ internal class FingerprintManagerImpl(
         isConnected = false
         unregisterReceiver()
         fingerprintScanner?.disconnect()
-        eventsFlow.tryEmit(FingerprintEvent.Disconnected)
+        emitEvent(FingerprintEvent.Disconnected)
     }
 
     override fun scan(count: Int): Boolean {
         if (!isConnected) {
-            eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed)
+            emitEvent(FingerprintEvent.ConnectingFailed)
             return false
         }
         reset()
@@ -109,16 +109,18 @@ internal class FingerprintManagerImpl(
             context.registerReceiver(usbReceiver, filter)
     }
 
+    private fun emitEvent(event: FingerprintEvent) = scope.launch { eventsFlow.emit(event) }
+
     private fun requestUsbPermission() {
         usbManager.supportedDevice?.let { device ->
             val fingerprintScanner = fingerprintScanner ?: return
             if (usbManager!!.hasPermission(device))
                 isConnected = fingerprintScanner.reconnect(device).apply {
-                    eventsFlow.tryEmit(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
+                    emitEvent(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
                 }
             else
                 usbManager.requestPermission(device, permissionIntent)
-        } ?: eventsFlow.tryEmit(FingerprintEvent.Idle)
+        } ?: emitEvent(FingerprintEvent.Idle)
     }
 
     private val usbReceiver = object : BroadcastReceiver() {
@@ -136,7 +138,7 @@ internal class FingerprintManagerImpl(
                                 @Suppress("DEPRECATION")
                                 intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
                             )
-                        ?: return eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed).returnUnit()
+                        ?: return emitEvent(FingerprintEvent.ConnectingFailed).returnUnit()
 
                     val isGranted = intent.getBooleanExtra(
                         UsbManager.EXTRA_PERMISSION_GRANTED,
@@ -146,19 +148,19 @@ internal class FingerprintManagerImpl(
                     val fingerprintScanner = fingerprintScanner ?: return
                     if (isGranted)
                         isConnected = fingerprintScanner.reconnect(device).apply {
-                            eventsFlow.tryEmit(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
+                            emitEvent(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
                         }
                     else
-                        eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed)
+                        emitEvent(FingerprintEvent.ConnectingFailed)
                 }
 
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-                    eventsFlow.tryEmit(FingerprintEvent.DeviceAttached)
+                    emitEvent(FingerprintEvent.DeviceAttached)
                     requestUsbPermission()
                 }
 
                 UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                    eventsFlow.tryEmit(FingerprintEvent.DeviceDetached)
+                    emitEvent(FingerprintEvent.DeviceDetached)
                     disconnect()
                 }
 
@@ -200,10 +202,10 @@ internal class FingerprintManagerImpl(
         }
     }
 
-    private fun onFingerLiftDuringScanning() {
+    private suspend fun onFingerLiftDuringScanning() {
         scanningJob?.cancel()
         isCanceled = true
-        eventsFlow.tryEmit(FingerprintEvent.ProcessCanceledTheFingerLifted)
+        eventsFlow.emit(FingerprintEvent.ProcessCanceledTheFingerLifted)
     }
 
     private fun reset() {
@@ -272,7 +274,7 @@ internal class FingerprintManagerImpl(
             delay(SCAN_DELAY_IN_MILLIS)
             true
         } else {
-            eventsFlow.tryEmit(FingerprintEvent.CapturingFailed)
+            eventsFlow.emit(FingerprintEvent.CapturingFailed)
             false
         }
     }.onFailure { Log.e("DEBUGGING -> getImageData() -> ", it.toString()) }
