@@ -7,18 +7,39 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import com.fingerprint.utils.Constants.BMP_DESTINATION_OFFSET
 import com.fingerprint.utils.UsbOperationHelper.intToByteArray
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
 
 
 @Suppress("UnusedReceiverParameter")
 fun Any.returnUnit() = Unit
 
 inline fun <reified T> T.toJson(): String = Json.encodeToString(this)
+
+fun Bitmap.toRawByteArray(): ByteArray {
+    val size = rowBytes * height
+    val buffer = ByteBuffer.allocate(size)
+    this.copyPixelsToBuffer(buffer)
+    return buffer.array()
+}
+
+fun ImageBitmap.toRawByteArray(): ByteArray = asAndroidBitmap().toRawByteArray()
+
+fun ByteArray.toRawBitmap(width: Int, height: Int, config: Bitmap.Config = Bitmap.Config.ARGB_8888): Bitmap {
+    val buffer = ByteBuffer.wrap(this)
+    val bitmap = Bitmap.createBitmap(width, height, config)
+    bitmap.copyPixelsFromBuffer(buffer)
+    return bitmap
+}
+
+fun ByteArray.toRawImageBitmap(width: Int, height: Int, config: Bitmap.Config = Bitmap.Config.ARGB_8888): ImageBitmap =
+    toRawBitmap(width, height, config).asImageBitmap()
 
 fun Bitmap.toByteArray(): ByteArray = ByteArrayOutputStream().apply {
     compress(Bitmap.CompressFormat.PNG, 100, this)
@@ -72,12 +93,7 @@ internal fun ByteArray.convertImageDataToBitmapArray(
 }
 
 fun Bitmap.applyFilters(config: Bitmap.Config): Bitmap {
-    val contrast = 1.75f
-    val contrastMatrix = ColorMatrix().apply {
-        setScale(contrast, contrast, contrast, 1f)
-        setSaturation(0f)
-    }
-
+    val contrastMatrix = ColorMatrix().apply { setSaturation(0f) }
     val paint = Paint().apply { colorFilter = ColorMatrixColorFilter(contrastMatrix) }
     val enhancedBitmap = Bitmap.createBitmap(width, height, config)
     val canvas = Canvas(enhancedBitmap)
@@ -92,3 +108,14 @@ internal fun ByteArray.insertAt(value: Int, index: Int): Int {
     this[index + 3] = (value shr 24).toByte()
     return index + 4
 }
+
+internal infix fun Float?.greaterThan(other: Float?): Boolean =
+    this != null && other != null && this > other
+
+internal fun ByteArray.getPixelBrightness(position: Int): Float = runCatching {
+    val red = (this[position + 0].toInt() shr 16) and 0xFF
+    val green = (this[position + 1].toInt() shr 8) and 0xFF
+    val blue = this[position + 2].toInt() and 0xFF
+    val brightness = 0.299f * red + 0.587f * green + 0.114f * blue
+    return brightness
+}.getOrDefault(0f)

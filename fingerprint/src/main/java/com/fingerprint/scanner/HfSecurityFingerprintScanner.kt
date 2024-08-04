@@ -24,6 +24,7 @@ import com.fingerprint.utils.UsbOperationHelper.EMPTY_BYTE
 import com.fingerprint.utils.UsbOperationHelper.createCommandBlockWrapper
 import com.fingerprint.utils.applyFilters
 import com.fingerprint.utils.convertImageDataToBitmapArray
+import com.fingerprint.utils.greaterThan
 import com.fingerprint.utils.returnUnit
 
 
@@ -82,6 +83,9 @@ internal class HfSecurityFingerprintScanner(
             applyFilters = Bitmap::applyFilters
         ) else null
     }
+
+    override suspend fun isCleanRequired(): Boolean =
+        getBrightness().also { Log.i("DEBUGGING", "BRIGHTNESS -> $it") } greaterThan CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD
 
     override fun captureImage(imageType: ScannedImageType): Boolean = runCatching {
         this.imageType = imageType
@@ -413,6 +417,8 @@ internal class HfSecurityFingerprintScanner(
     }
 
     companion object {
+        private const val CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD = 300_000f
+
         fun isHfSecurityDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {
             1107 -> productId == 36869
             8201 -> productId == 30264

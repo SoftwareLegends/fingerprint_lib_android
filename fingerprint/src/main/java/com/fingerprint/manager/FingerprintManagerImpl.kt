@@ -14,15 +14,22 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
-import com.fingerprint.manager.FingerprintManagerImpl.Companion.ACTION_USB_PERMISSION
 import com.fingerprint.scanner.FingerprintScanner
+import com.fingerprint.scanner.FutronictechFingerprintScanner
 import com.fingerprint.scanner.FutronictechFingerprintScanner.Companion.isFutronicDevice
+import com.fingerprint.scanner.HfSecurityFingerprintScanner
 import com.fingerprint.scanner.HfSecurityFingerprintScanner.Companion.isHfSecurityDevice
+import com.fingerprint.utils.Constants.ACTION_USB_PERMISSION
+import com.fingerprint.utils.Constants.DEFAULT_BRIGHTNESS_THRESHOLD
 import com.fingerprint.utils.ScannedImageType
+import com.fingerprint.utils.getPixelBrightness
 import com.fingerprint.utils.returnUnit
 import com.fingerprint.utils.toImageBitmap
+import com.fingerprint.utils.toRawByteArray
+import com.fingerprint.utils.toRawImageBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -41,11 +48,12 @@ internal class FingerprintManagerImpl(
     override val eventsFlow = MutableStateFlow<FingerprintEvent>(FingerprintEvent.Idle)
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
     override var bestCapture: ImageBitmap? by mutableStateOf(null)
-    override var bestCaptureIndex: Int = Int.MIN_VALUE
+    override var bestCaptureIndex: Int = INVALID_INDEX
     override val deviceInfo: FingerprintDeviceInfo
         get() = fingerprintScanner?.deviceInfo ?: FingerprintDeviceInfo.Unknown
 
-    private var bestCaptureValue: Int = Int.MIN_VALUE
+    private var bestCaptureValue: Float = MIN_VALUE
+    private var brightnessThreshold: Float = DEFAULT_BRIGHTNESS_THRESHOLD
     private var imageType: ScannedImageType = ScannedImageType.Extra
     private var scanningJob: Job? = null
     private var isCanceled: Boolean = false
@@ -60,7 +68,7 @@ internal class FingerprintManagerImpl(
         fingerprintScanner = initializeFingerprintScanner()
         registerReceiver()
         requestUsbPermission()
-        if (isConnected) fingerprintScanner?.tunOffLed()
+        if (isConnected) fingerprintScanner?.turnOffLed()
     }
 
     override fun disconnect() {
@@ -68,12 +76,12 @@ internal class FingerprintManagerImpl(
         isConnected = false
         unregisterReceiver()
         fingerprintScanner?.disconnect()
-        eventsFlow.tryEmit(FingerprintEvent.Disconnected)
+        emitEvent(FingerprintEvent.Disconnected)
     }
 
     override fun scan(count: Int): Boolean {
         if (!isConnected) {
-            eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed)
+            emitEvent(FingerprintEvent.ConnectingFailed)
             return false
         }
         reset()
@@ -101,16 +109,18 @@ internal class FingerprintManagerImpl(
             context.registerReceiver(usbReceiver, filter)
     }
 
+    private fun emitEvent(event: FingerprintEvent) = scope.launch { eventsFlow.emit(event) }
+
     private fun requestUsbPermission() {
         usbManager.supportedDevice?.let { device ->
             val fingerprintScanner = fingerprintScanner ?: return
             if (usbManager!!.hasPermission(device))
                 isConnected = fingerprintScanner.reconnect(device).apply {
-                    eventsFlow.tryEmit(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
+                    emitEvent(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
                 }
             else
                 usbManager.requestPermission(device, permissionIntent)
-        } ?: eventsFlow.tryEmit(FingerprintEvent.Idle)
+        } ?: emitEvent(FingerprintEvent.Idle)
     }
 
     private val usbReceiver = object : BroadcastReceiver() {
@@ -128,7 +138,7 @@ internal class FingerprintManagerImpl(
                                 @Suppress("DEPRECATION")
                                 intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
                             )
-                        ?: return eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed).returnUnit()
+                        ?: return emitEvent(FingerprintEvent.ConnectingFailed).returnUnit()
 
                     val isGranted = intent.getBooleanExtra(
                         UsbManager.EXTRA_PERMISSION_GRANTED,
@@ -138,19 +148,19 @@ internal class FingerprintManagerImpl(
                     val fingerprintScanner = fingerprintScanner ?: return
                     if (isGranted)
                         isConnected = fingerprintScanner.reconnect(device).apply {
-                            eventsFlow.tryEmit(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
+                            emitEvent(if (this) FingerprintEvent.Connected else FingerprintEvent.ConnectingFailed)
                         }
                     else
-                        eventsFlow.tryEmit(FingerprintEvent.ConnectingFailed)
+                        emitEvent(FingerprintEvent.ConnectingFailed)
                 }
 
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-                    eventsFlow.tryEmit(FingerprintEvent.DeviceAttached)
+                    emitEvent(FingerprintEvent.DeviceAttached)
                     requestUsbPermission()
                 }
 
                 UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                    eventsFlow.tryEmit(FingerprintEvent.DeviceDetached)
+                    emitEvent(FingerprintEvent.DeviceDetached)
                     disconnect()
                 }
 
@@ -166,13 +176,36 @@ internal class FingerprintManagerImpl(
             processCapture()
         }
         eventsFlow.emit(FingerprintEvent.CapturedSuccessfully)
-        bestCapture = captures[bestCaptureIndex]
+        improveTheBestCapture()
     }.onFailure { Log.e("DEBUGGING -> startProcessing() -> ", it.toString()) }
 
-    private fun onFingerLiftDuringScanning() {
+    override fun improveTheBestCapture(isApplyFilters: Boolean, isBlue: Boolean) {
+        captures.getOrNull(bestCaptureIndex)?.run {
+            val bitmap = asAndroidBitmap()
+            val byteArray = bitmap.toRawByteArray()
+
+            if (isApplyFilters)
+                for (i in byteArray.indices step 4) {
+                    val brightness = byteArray.getPixelBrightness(i)
+                    if (brightness <= brightnessThreshold)
+                        byteArray.writeColor(
+                            red = false,
+                            green = false,
+                            blue = isBlue,
+                            position = i,
+                            alpha = (fingerprintScanner is HfSecurityFingerprintScanner)
+                        )
+                    else
+                        byteArray.writeWhiteColor(i)
+                }
+            bestCapture = byteArray.toRawImageBitmap(width, height)
+        }
+    }
+
+    private suspend fun onFingerLiftDuringScanning() {
         scanningJob?.cancel()
         isCanceled = true
-        eventsFlow.tryEmit(FingerprintEvent.ProcessCanceledTheFingerLifted)
+        eventsFlow.emit(FingerprintEvent.ProcessCanceledTheFingerLifted)
     }
 
     private fun reset() {
@@ -184,59 +217,96 @@ internal class FingerprintManagerImpl(
         captureIndex = 0
         captureTimeout = 0
         progress = 0f
-        bestCaptureIndex = Int.MIN_VALUE
-        bestCaptureValue = Int.MIN_VALUE
+        bestCaptureIndex = INVALID_INDEX
+        bestCaptureValue = MIN_VALUE
     }
 
     private suspend fun processCapture() {
-        val isFirstCapture = captureIndex == 0
+        val isFirstCapture = captureIndex == FIRST_CAPTURE_INDEX
         if (isFirstCapture)
             eventsFlow.emit(FingerprintEvent.PlaceFinger)
         else
             eventsFlow.emit(FingerprintEvent.KeepFinger)
 
-        if (!captureImage() && !getImageData()) return
+        if (!captureImage()) return
+        if (!getImageData()) return
+
         progress = (captureIndex + 1) / captureCount.toFloat()
     }
 
     private suspend fun captureImage(): Boolean {
         val fingerprintScanner = fingerprintScanner ?: return false
         while (true) {
+            val isFirstCapture = (captureIndex == FIRST_CAPTURE_INDEX)
             delay(SCAN_DELAY_IN_MILLIS)
-            if (fingerprintScanner.captureImage(imageType)) return true
-            if (captureIndex in 1..captureCount) onFingerLiftDuringScanning()
-            if (isCanceled) return false
+
+            when {
+                isCanceled -> return false
+                fingerprintScanner.captureImage(imageType) -> return true
+                isFirstCapture.not() -> onFingerLiftDuringScanning()
+                fingerprintScanner.isCleanRequired() -> {
+                    eventsFlow.emit(FingerprintEvent.CleanTheFingerprint)
+                    continue
+                }
+
+                else -> eventsFlow.emit(FingerprintEvent.KeepFinger)
+            }
         }
+    }
+
+    private fun initializeBrightnessThreshold(bitmap: ImageBitmap) {
+        if (brightnessThreshold != DEFAULT_BRIGHTNESS_THRESHOLD) return
+        brightnessThreshold = if (fingerprintScanner is FutronictechFingerprintScanner)
+            bitmap.width / FUTRONICTECH_THRESHOLD_DIVISOR
+        else
+            bitmap.width / DEFAULT_THRESHOLD_DIVISOR
     }
 
     private suspend fun getImageData(): Boolean = runCatching {
         val fingerprintScanner = fingerprintScanner ?: return false
         val bitmapArray = fingerprintScanner.getImageBytes()
         return if (bitmapArray != null) {
+            val bitmap = bitmapArray.toImageBitmap()
+            initializeBrightnessThreshold(bitmap)
             findTheBestCapture(bitmapArray)
-            captures.add(bitmapArray.toImageBitmap())
+            captures.add(bitmap)
             eventsFlow.emit(FingerprintEvent.NewImage(bitmapArray))
             delay(SCAN_DELAY_IN_MILLIS)
             true
         } else {
-            eventsFlow.tryEmit(FingerprintEvent.CapturingFailed)
+            eventsFlow.emit(FingerprintEvent.CapturingFailed)
             false
         }
     }.onFailure { Log.e("DEBUGGING -> getImageData() -> ", it.toString()) }
         .getOrDefault(false)
 
     private fun findTheBestCapture(byteArray: ByteArray) {
-        val newValue = byteArray.sum()
+        val newValue = calculateDarkness(byteArray)
         if (newValue > bestCaptureValue) {
             bestCaptureValue = newValue
             bestCaptureIndex = captureIndex
         }
     }
 
-    companion object {
+    private fun calculateDarkness(imageArray: ByteArray): Float {
+        var count = 0f
+        for (i in imageArray.indices step 4) {
+            val brightness = imageArray.getPixelBrightness(i)
+            if (brightness <= brightnessThreshold / DARKNESS_THRESHOLD_DIVISOR)
+                count += brightness
+        }
+        return count
+    }
+
+    private companion object {
         const val MAX_SCAN_COUNT = 5
         const val SCAN_DELAY_IN_MILLIS: Long = 50
-        const val ACTION_USB_PERMISSION = "com.fingerprint.USB_PERMISSION"
+        const val INVALID_INDEX = Int.MIN_VALUE
+        const val MIN_VALUE = Float.MIN_VALUE
+        const val FIRST_CAPTURE_INDEX = 0
+        const val FUTRONICTECH_THRESHOLD_DIVISOR = 1.291f
+        const val DEFAULT_THRESHOLD_DIVISOR = 2.3f
+        const val DARKNESS_THRESHOLD_DIVISOR = 1.75f
     }
 }
 
@@ -255,3 +325,38 @@ private fun Context.createPendingIntent(): PendingIntent {
 
 private val UsbManager?.supportedDevice: UsbDevice?
     get() = this?.deviceList?.values?.firstOrNull(UsbDevice::isSupportedDevice)
+
+private fun ByteArray.writeColor(
+    position: Int,
+    red: Int,
+    green: Int,
+    blue: Int,
+    isAlpha: Boolean = false
+) = runCatching {
+    this[position + 0] = red.toByte()
+    this[position + 1] = green.toByte()
+    this[position + 2] = blue.toByte()
+    if (isAlpha)
+        this[position + 3] = 255.toByte()
+}
+
+private fun ByteArray.writeColor(
+    position: Int,
+    red: Boolean,
+    green: Boolean,
+    blue: Boolean,
+    alpha: Boolean = false,
+) = writeColor(
+    position = position,
+    red = if (red) 255 else 0,
+    green = if (green) 255 else 0,
+    blue = if (blue) 255 else 0,
+    isAlpha = alpha
+)
+
+private fun ByteArray.writeWhiteColor(position: Int) = writeColor(
+    position,
+    red = true,
+    green = true,
+    blue = true
+)

@@ -14,5 +14,6 @@ sealed class FingerprintEvent(val message: String) {
     data object KeepFinger : FingerprintEvent("Keep Finger")
     data object CapturedSuccessfully : FingerprintEvent("Captured Successfully")
     data object CapturingFailed : FingerprintEvent("Capturing Failed")
+    data object CleanTheFingerprint : FingerprintEvent("Clean The Fingerprint")
     class NewImage(val bitmapArray: ByteArray) : FingerprintEvent("New Image")
 }
