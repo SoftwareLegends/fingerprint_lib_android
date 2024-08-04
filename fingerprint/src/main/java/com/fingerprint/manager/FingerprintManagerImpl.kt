@@ -48,11 +48,11 @@ internal class FingerprintManagerImpl(
     override val eventsFlow = MutableStateFlow<FingerprintEvent>(FingerprintEvent.Idle)
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
     override var bestCapture: ImageBitmap? by mutableStateOf(null)
-    override var bestCaptureIndex: Int = Int.MIN_VALUE
+    override var bestCaptureIndex: Int = INVALID_INDEX
     override val deviceInfo: FingerprintDeviceInfo
         get() = fingerprintScanner?.deviceInfo ?: FingerprintDeviceInfo.Unknown
 
-    private var bestCaptureValue: Float = Float.MIN_VALUE
+    private var bestCaptureValue: Float = MIN_VALUE
     private var brightnessThreshold: Float = DEFAULT_BRIGHTNESS_THRESHOLD
     private var imageType: ScannedImageType = ScannedImageType.Extra
     private var scanningJob: Job? = null
@@ -217,12 +217,12 @@ internal class FingerprintManagerImpl(
         captureIndex = 0
         captureTimeout = 0
         progress = 0f
-        bestCaptureIndex = Int.MIN_VALUE
-        bestCaptureValue = Float.MIN_VALUE
+        bestCaptureIndex = INVALID_INDEX
+        bestCaptureValue = MIN_VALUE
     }
 
     private suspend fun processCapture() {
-        val isFirstCapture = captureIndex == 0
+        val isFirstCapture = captureIndex == FIRST_CAPTURE_INDEX
         if (isFirstCapture)
             eventsFlow.emit(FingerprintEvent.PlaceFinger)
         else
@@ -237,7 +237,7 @@ internal class FingerprintManagerImpl(
     private suspend fun captureImage(): Boolean {
         val fingerprintScanner = fingerprintScanner ?: return false
         while (true) {
-            val isFirstCapture = (captureIndex == 0)
+            val isFirstCapture = (captureIndex == FIRST_CAPTURE_INDEX)
             delay(SCAN_DELAY_IN_MILLIS)
 
             when {
@@ -257,9 +257,9 @@ internal class FingerprintManagerImpl(
     private fun initializeBrightnessThreshold(bitmap: ImageBitmap) {
         if (brightnessThreshold != DEFAULT_BRIGHTNESS_THRESHOLD) return
         brightnessThreshold = if (fingerprintScanner is FutronictechFingerprintScanner)
-            bitmap.width / 1.291f
+            bitmap.width / FUTRONICTECH_THRESHOLD_DIVISOR
         else
-            bitmap.width / 2.3f
+            bitmap.width / DEFAULT_THRESHOLD_DIVISOR
     }
 
     private suspend fun getImageData(): Boolean = runCatching {
@@ -292,14 +292,21 @@ internal class FingerprintManagerImpl(
         var count = 0f
         for (i in imageArray.indices step 4) {
             val brightness = imageArray.getPixelBrightness(i)
-            if (brightness <= brightnessThreshold / 1.75f) count += brightness
+            if (brightness <= brightnessThreshold / DARKNESS_THRESHOLD_DIVISOR)
+                count += brightness
         }
         return count
     }
 
-    companion object {
+    private companion object {
         const val MAX_SCAN_COUNT = 5
         const val SCAN_DELAY_IN_MILLIS: Long = 50
+        const val INVALID_INDEX = Int.MIN_VALUE
+        const val MIN_VALUE = Float.MIN_VALUE
+        const val FIRST_CAPTURE_INDEX = 0
+        const val FUTRONICTECH_THRESHOLD_DIVISOR = 1.291f
+        const val DEFAULT_THRESHOLD_DIVISOR = 2.3f
+        const val DARKNESS_THRESHOLD_DIVISOR = 1.75f
     }
 }
 
