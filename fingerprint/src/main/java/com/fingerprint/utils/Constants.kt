@@ -25,4 +25,6 @@ internal object Constants {
     const val GET_IMAGE_EXTRA_COMMAND: Byte = 0x31
     const val VERIFY_PASSWORD_COMMAND: Byte = 0x13
     const val GENERAL_SEND_PACKAGE_ADDRESS: Int = -1
+    const val DEFAULT_BRIGHTNESS_THRESHOLD = 128f
+    const val ACTION_USB_PERMISSION = "com.fingerprint.USB_PERMISSION"
 }
