@@ -43,7 +43,7 @@ internal class HfSecurityFingerprintScanner(
             manufacturer = device?.manufacturerName
         )
 
-    override fun tunOffLed() = captureImage(imageType).returnUnit()
+    override fun turnOffLed() = captureImage(imageType).returnUnit()
 
     override fun connect(usbDevice: UsbDevice): Boolean {
         device = usbDevice

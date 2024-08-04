@@ -9,7 +9,7 @@ import com.fingerprint.utils.getPixelBrightness
 
 internal interface FingerprintScanner {
     val deviceInfo: FingerprintDeviceInfo
-    fun tunOffLed() = Unit
+    fun turnOffLed() = Unit
     fun connect(usbDevice: UsbDevice): Boolean
     fun reconnect(usbDevice: UsbDevice): Boolean
     fun disconnect(): Boolean
