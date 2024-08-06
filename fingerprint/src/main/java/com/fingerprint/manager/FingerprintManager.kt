@@ -3,11 +3,11 @@ package com.fingerprint.manager
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharedFlow
 
 
 interface FingerprintManager : DefaultLifecycleObserver {
-    val eventsFlow: StateFlow<FingerprintEvent>
+    val eventsFlow: SharedFlow<FingerprintEvent>
     val captures: List<ImageBitmap>
     val bestCapture: ImageBitmap?
     val bestCaptureIndex: Int
