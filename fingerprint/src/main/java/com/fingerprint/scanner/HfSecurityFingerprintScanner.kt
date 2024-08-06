@@ -25,6 +25,7 @@ import com.fingerprint.utils.UsbOperationHelper.createCommandBlockWrapper
 import com.fingerprint.utils.applyFilters
 import com.fingerprint.utils.convertImageDataToBitmapArray
 import com.fingerprint.utils.greaterThan
+import com.fingerprint.utils.removeQuestionMark
 import com.fingerprint.utils.returnUnit
 
 
@@ -39,8 +40,8 @@ internal class HfSecurityFingerprintScanner(
             vendorId = device?.vendorId,
             productId = device?.productId,
             model = if (deviceType in 1..2) "HF4000" else "Unknown",
-            product = device?.productName,
-            manufacturer = device?.manufacturerName
+            product = device?.productName.removeQuestionMark(),
+            manufacturer = device?.manufacturerName.removeQuestionMark()
         )
 
     override fun turnOffLed() = captureImage(imageType).returnUnit()
