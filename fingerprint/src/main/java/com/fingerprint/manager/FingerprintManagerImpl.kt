@@ -177,6 +177,7 @@ internal class FingerprintManagerImpl(
         }
         eventsFlow.emit(FingerprintEvent.CapturedSuccessfully)
         improveTheBestCapture()
+        progress = 0f
     }.onFailure { Log.e("DEBUGGING -> startProcessing() -> ", it.toString()) }
 
     override fun improveTheBestCapture(isApplyFilters: Boolean, isBlue: Boolean) {
