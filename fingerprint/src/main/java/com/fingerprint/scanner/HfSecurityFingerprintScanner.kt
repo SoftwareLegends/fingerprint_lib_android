@@ -86,7 +86,7 @@ internal class HfSecurityFingerprintScanner(
     }
 
     override suspend fun isCleanRequired(): Boolean =
-        getBrightness().also { Log.i("DEBUGGING", "BRIGHTNESS -> $it") } greaterThan CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD
+        getBrightness().also { Log.i("DEBUGGING", "BRIGHTNESS -> $it") } in MIN_CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD..MAX_CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD
 
     override fun captureImage(imageType: ScannedImageType): Boolean = runCatching {
         this.imageType = imageType
@@ -418,7 +418,8 @@ internal class HfSecurityFingerprintScanner(
     }
 
     companion object {
-        private const val CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD = 300_000f
+        private const val MIN_CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD = 337_000f
+        private const val MAX_CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD = 475_000f
 
         fun isHfSecurityDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {
             1107 -> productId == 36869
