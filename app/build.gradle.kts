@@ -1,3 +1,7 @@
+import java.io.FileInputStream
+import java.io.InputStreamReader
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
@@ -8,9 +12,11 @@ plugins {
 }
 
 object Release {
-    val versionCode = 9
+    val versionCode = 10
     val versionName = "1.0.${versionCode - 1}"
 }
+
+val getKey = { key: String -> getLocalProperty(key, root = rootDir.path) }
 
 android {
     namespace = "com.fingerprint.app"
@@ -24,14 +30,23 @@ android {
         versionName = Release.versionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
+    }
+
+    signingConfigs {
+        create("release") {
+            keyAlias = getKey("keyAlias")
+            keyPassword = getKey("keyPassword")
+            storeFile = file(getKey("storeFile"))
+            storePassword = getKey("storePassword")
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            isShrinkResources = false
+            signingConfig = signingConfigs.getByName("release")
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -48,11 +63,11 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
     buildFeatures {
         compose = true
@@ -108,4 +123,24 @@ task<Copy>("moveReleaseApk") {
 
     dependsOn("assembleRelease")
     shouldRunAfter("assembleRelease")
+}
+
+fun getLocalProperty(key: String, file: String? = null, root: String = "."): String {
+    val properties = Properties()
+    val defaultFiles = listOf("$root/local.properties", "$root/defaults.properties")
+    val files = (defaultFiles + file).mapNotNull { it }
+
+    files.forEach {
+        val localProperties = File(it)
+        if (localProperties.isFile) {
+            runCatching {
+                InputStreamReader(FileInputStream(localProperties), Charsets.UTF_8).use { reader ->
+                    if (properties[key] in listOf(null, ""))
+                        properties.load(reader)
+                }
+            }
+        }
+    }
+
+    return properties.getProperty(key).toString()
 }

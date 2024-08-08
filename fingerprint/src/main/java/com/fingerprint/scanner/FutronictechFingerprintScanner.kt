@@ -14,6 +14,7 @@ import com.fingerprint.utils.applyFilters
 import com.fingerprint.utils.convertImageDataToBitmapArray
 import com.fingerprint.utils.greaterThan
 import com.fingerprint.utils.insertAt
+import com.fingerprint.utils.removeQuestionMark
 import com.futronictech.Scanner
 
 
@@ -31,8 +32,8 @@ internal class FutronictechFingerprintScanner(
             vendorId = device?.vendorId,
             productId = device?.productId,
             model = "FS80H",
-            product = device?.productName,
-            manufacturer = device?.manufacturerName
+            product = device?.productName.removeQuestionMark(),
+            manufacturer = device?.manufacturerName.removeQuestionMark()
         )
 
     override fun connect(usbDevice: UsbDevice): Boolean {

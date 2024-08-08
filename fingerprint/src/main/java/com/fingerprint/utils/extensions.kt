@@ -119,3 +119,5 @@ internal fun ByteArray.getPixelBrightness(position: Int): Float = runCatching {
     val brightness = 0.299f * red + 0.587f * green + 0.114f * blue
     return brightness
 }.getOrDefault(0f)
+
+fun String?.removeQuestionMark() = this?.replace("?", "")

@@ -90,10 +90,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun initializeFingerprintManager() {
+        val scope = CoroutineScope(Dispatchers.IO)
         fingerprintManager = FingerprintInitializer(
             context = this,
             lifecycle = lifecycle,
-            scope = CoroutineScope(Dispatchers.IO)
+            scope = scope
         ).create()
     }
 }
@@ -109,11 +110,11 @@ fun App(fingerprintManager: FingerprintManager) {
     var showInfo by remember { mutableStateOf(false) }
     var isBlue by remember { mutableStateOf(false) }
     var isFilter by remember { mutableStateOf(false) }
-    val events by fingerprintManager.eventsFlow.collectAsStateWithLifecycle()
+    val events by fingerprintManager.eventsFlow.collectAsStateWithLifecycle(FingerprintEvent.Idle)
     val focusManager = LocalFocusManager.current
 
     LaunchedEffect(key1 = events) {
-        println("DEBUGGING -> Progress: ${fingerprintManager.progress}")
+        println("DEBUGGING -> Progress: ${fingerprintManager.progress} - Event: $events")
         when (events) {
             is FingerprintEvent.Connected,
             is FingerprintEvent.CapturedSuccessfully,
