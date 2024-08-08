@@ -45,7 +45,7 @@ internal class FingerprintManagerImpl(
 ) : FingerprintManager {
     private var fingerprintScanner: FingerprintScanner? = initializeFingerprintScanner()
     override var progress: Float = 0f
-    override val eventsFlow = MutableSharedFlow<FingerprintEvent>()
+    override val eventsFlow = MutableSharedFlow<FingerprintEvent>(replay = 1)
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
     override var bestCapture: ImageBitmap? by mutableStateOf(null)
     override var bestCaptureIndex: Int = INVALID_INDEX
@@ -120,7 +120,8 @@ internal class FingerprintManagerImpl(
         scope.launch { eventsFlow.emit(event) }.returnUnit()
 
     private fun requestUsbPermission() {
-        if (isUsbPermissionGranted || isUsbPermissionRequestInProgress) return
+
+        if ((isUsbPermissionGranted || isUsbPermissionRequestInProgress) && isConnected) return
 
         usbManager.supportedDevice?.let { device ->
             val fingerprintScanner = fingerprintScanner ?: return
