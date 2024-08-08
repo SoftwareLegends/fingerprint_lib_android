@@ -13,6 +13,7 @@ interface FingerprintManager : DefaultLifecycleObserver {
     val bestCaptureIndex: Int
     val deviceInfo: FingerprintDeviceInfo
     val progress: Float
+    val isConnected: Boolean
 
     fun connect()
     fun disconnect()

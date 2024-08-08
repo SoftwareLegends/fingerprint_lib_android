@@ -49,6 +49,7 @@ internal class FingerprintManagerImpl(
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
     override var bestCapture: ImageBitmap? by mutableStateOf(null)
     override var bestCaptureIndex: Int = INVALID_INDEX
+    override var isConnected: Boolean by mutableStateOf(false)
     override val deviceInfo: FingerprintDeviceInfo
         get() = fingerprintScanner?.deviceInfo ?: FingerprintDeviceInfo.Unknown
 
@@ -58,7 +59,6 @@ internal class FingerprintManagerImpl(
     private var scanningJob: Job? = null
     private var isLocked: Boolean = false
     private var isCanceled: Boolean = false
-    private var isConnected: Boolean = false
     private var isUsbPermissionGranted: Boolean = false
     private var isUsbPermissionRequestInProgress: Boolean = false
     private var captureCount: Int = 0
