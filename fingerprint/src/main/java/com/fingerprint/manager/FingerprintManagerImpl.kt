@@ -45,7 +45,7 @@ internal class FingerprintManagerImpl(
 ) : FingerprintManager {
     private var fingerprintScanner: FingerprintScanner? = initializeFingerprintScanner()
     override var progress: Float = 0f
-    override val eventsFlow = MutableSharedFlow<FingerprintEvent>(replay = 1)
+    override val eventsFlow = MutableSharedFlow<FingerprintEvent>()
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
     override var bestCapture: ImageBitmap? by mutableStateOf(null)
     override var bestCaptureIndex: Int = INVALID_INDEX
@@ -197,9 +197,8 @@ internal class FingerprintManagerImpl(
             captureIndex = i
             processCapture()
         }
-        eventsFlow.emit(FingerprintEvent.CapturedSuccessfully)
         improveTheBestCapture()
-        progress = 0f
+        eventsFlow.emit(FingerprintEvent.CapturedSuccessfully)
     }.onFailure { Log.e("DEBUGGING -> startProcessing() -> ", it.toString()) }
 
     override fun improveTheBestCapture(isApplyFilters: Boolean, isBlue: Boolean) {
