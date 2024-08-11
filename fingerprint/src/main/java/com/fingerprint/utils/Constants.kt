@@ -21,6 +21,8 @@ internal object Constants {
     const val MAX_PACKAGE_SIZE = 350
     const val RECEIVED_PACKAGE_LENGTH = 64
     const val RECEIVED_PACKAGE_TIMEOUT = 1000
+    const val SEND_CONTROL_MESSAGE_REQUEST = 0
+    const val RECEIVE_CONTROL_MESSAGE_REQUEST = 1
     const val RESPONSE_PACKET: Byte = 0x07
     const val DEFAULT_TIMEOUT = 10000
     const val GET_IMAGE_COMMAND: Byte = 0x0a
