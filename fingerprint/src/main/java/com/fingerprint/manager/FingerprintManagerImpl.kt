@@ -32,6 +32,7 @@ import com.fingerprint.utils.toRawByteArray
 import com.fingerprint.utils.toRawImageBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -45,7 +46,11 @@ internal class FingerprintManagerImpl(
 ) : FingerprintManager {
     private var fingerprintScanner: FingerprintScanner? = initializeFingerprintScanner()
     override var progress: Float = 0f
-    override val eventsFlow = MutableSharedFlow<FingerprintEvent>()
+    override val eventsFlow = MutableSharedFlow<FingerprintEvent>(
+        replay = 1,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
     override var bestCapture: ImageBitmap? by mutableStateOf(null)
     override var bestCaptureIndex: Int = INVALID_INDEX
