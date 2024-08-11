@@ -121,3 +121,5 @@ internal fun ByteArray.getPixelBrightness(position: Int): Float = runCatching {
 }.getOrDefault(0f)
 
 fun String?.removeQuestionMark() = this?.replace("?", "")
+
+infix fun Byte.isEqual(other: Number) = toLong() == other.toLong()
