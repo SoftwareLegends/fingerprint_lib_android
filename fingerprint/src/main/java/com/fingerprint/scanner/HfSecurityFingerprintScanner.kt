@@ -107,9 +107,9 @@ internal class HfSecurityFingerprintScanner(
 
         val sendData = ByteArray(MAX_PACKAGE_SIZE)
         val receiveData = ByteArray(MAX_PACKAGE_SIZE)
-        val content = ByteArray(10).also { array -> array[0] = this.imageType.captureCommand }
+        val content = createByteArray(firstValue = this.imageType.captureCommand)
 
-        fillPackage(dataBuffer = sendData, length = 1, contentBuffer = content)
+        fillPackage(dataBuffer = sendData, contentBuffer = content)
 
         if (!sendPackage(dataBuffer = sendData)) return false
 
@@ -216,11 +216,10 @@ internal class HfSecurityFingerprintScanner(
     }
 
     private fun receiveUsbDataForOtherTypes(length: Int, dataBuffer: ByteArray): Boolean {
-        val buffer = ByteArray(10)
         usbDeviceCommunicator.sendUsbControlMessage(
-            request = 1,
+            request = RECEIVE_CONTROL_MESSAGE_REQUEST,
             value = length,
-            buffer = buffer
+            buffer = createByteArray()
         )
 
         return usbDeviceCommunicator.readUsbBulkData(buffer = dataBuffer, length = length) >= 0
@@ -273,7 +272,7 @@ internal class HfSecurityFingerprintScanner(
                 var result: Int = usbDeviceCommunicator.sendUsbControlMessage(
                     request = RECEIVE_CONTROL_MESSAGE_REQUEST,
                     value = length,
-                    buffer = ByteArray(10),
+                    buffer = createByteArray()
                 )
 
                 result = receiveUsbImageImpl(
@@ -406,8 +405,8 @@ internal class HfSecurityFingerprintScanner(
 
     private fun fillPackage(
         dataBuffer: ByteArray,
-        length: Int,
         contentBuffer: ByteArray,
+        length: Int = 1,
         packageType: Byte = FILL_PACKAGE_COMMAND,
     ): Int {
         if (length < 0 || length > MAX_PACKAGE_SIZE) return 0
@@ -443,8 +442,8 @@ internal class HfSecurityFingerprintScanner(
         imageType: ScannedImageType = ScannedImageType.Normal
     ): Boolean {
         val sendData = ByteArray(MAX_PACKAGE_SIZE)
-        val content = ByteArray(10).apply { this[0] = imageType.getCommand }
-        fillPackage(dataBuffer = sendData, length = 1, contentBuffer = content)
+        val content = createByteArray(firstValue = imageType.getCommand)
+        fillPackage(dataBuffer = sendData, contentBuffer = content)
 
         if (sendPackage(dataBuffer = sendData).not()) return false
 
@@ -458,18 +457,18 @@ internal class HfSecurityFingerprintScanner(
 
     override fun verifyPassword(password: ByteArray): Boolean {
         val packageLength = 5
-        val content = ByteArray(10)
-        val sendData = ByteArray(MAX_PACKAGE_SIZE)
-        val receiveData = ByteArray(MAX_PACKAGE_SIZE)
+        val content = createByteArray()
+        val sendData = createByteArray(size = MAX_PACKAGE_SIZE)
+        val receiveData = createByteArray(size = MAX_PACKAGE_SIZE)
 
         content[0] = VERIFY_PASSWORD_COMMAND
         for (i in 1..<packageLength)
             content[i] = password[i - 1]
 
-        fillPackage(dataBuffer = sendData, length = packageLength, contentBuffer = content)
+        fillPackage(dataBuffer = sendData, contentBuffer = content, length = packageLength)
 
-        if (!sendPackage(dataBuffer = sendData)) return false
-        if (!receivePackage(dataBuffer = receiveData)) throw DeviceFailException()
+        if (sendPackage(dataBuffer = sendData).not()) return false
+        if (receivePackage(dataBuffer = receiveData).not()) throw DeviceFailException()
         return verifyResponsePackage(dataBuffer = receiveData)
     }
 
@@ -492,4 +491,8 @@ internal class HfSecurityFingerprintScanner(
             else -> false
         }
     }
+}
+
+private fun createByteArray(firstValue: Byte = 0x0, size: Int = 10) = ByteArray(size).apply {
+    this[0] = firstValue
 }

@@ -31,14 +31,22 @@ fun Bitmap.toRawByteArray(): ByteArray {
 
 fun ImageBitmap.toRawByteArray(): ByteArray = asAndroidBitmap().toRawByteArray()
 
-fun ByteArray.toRawBitmap(width: Int, height: Int, config: Bitmap.Config = Bitmap.Config.ARGB_8888): Bitmap {
+fun ByteArray.toRawBitmap(
+    width: Int,
+    height: Int,
+    config: Bitmap.Config = Bitmap.Config.ARGB_8888
+): Bitmap {
     val buffer = ByteBuffer.wrap(this)
     val bitmap = Bitmap.createBitmap(width, height, config)
     bitmap.copyPixelsFromBuffer(buffer)
     return bitmap
 }
 
-fun ByteArray.toRawImageBitmap(width: Int, height: Int, config: Bitmap.Config = Bitmap.Config.ARGB_8888): ImageBitmap =
+fun ByteArray.toRawImageBitmap(
+    width: Int,
+    height: Int,
+    config: Bitmap.Config = Bitmap.Config.ARGB_8888
+): ImageBitmap =
     toRawBitmap(width, height, config).asImageBitmap()
 
 fun Bitmap.toByteArray(): ByteArray = ByteArrayOutputStream().apply {
