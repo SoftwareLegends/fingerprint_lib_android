@@ -32,14 +32,16 @@ import com.fingerprint.utils.returnUnit
 internal class HfSecurityFingerprintScanner(
     private val usbDeviceCommunicator: UsbDeviceCommunicator
 ) : FingerprintScanner {
-    private var deviceType: Int = 0
+    var deviceType: DeviceType = DeviceType.Unknown
+        private set
     private var imageType: ScannedImageType = ScannedImageType.Normal
     private var device: UsbDevice? = null
+
     override val deviceInfo: FingerprintDeviceInfo
         get() = FingerprintDeviceInfo(
+            model = deviceType.name,
             vendorId = device?.vendorId,
             productId = device?.productId,
-            model = if (deviceType in 1..2) "HF4000" else "Unknown",
             product = device?.productName.removeQuestionMark(),
             manufacturer = device?.manufacturerName.removeQuestionMark()
         )
@@ -89,10 +91,14 @@ internal class HfSecurityFingerprintScanner(
         getBrightness().also { Log.i("DEBUGGING", "BRIGHTNESS -> $it") } in MIN_CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD..MAX_CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD
 
     override fun captureImage(imageType: ScannedImageType): Boolean = runCatching {
-        this.imageType = imageType
-        val command = ByteArray(10).apply { this[0] = imageType.captureCommand }
+        this.imageType = if (deviceType == DeviceType.HF4000_V1)
+            ScannedImageType.Normal
+        else
+            imageType
+
         val sendData = ByteArray(MAX_PACKAGE_SIZE)
         val receiveData = ByteArray(MAX_PACKAGE_SIZE)
+        val command = ByteArray(10).also { array -> array[0] = this.imageType.captureCommand }
 
         fillPackage(sendData, FILL_PACKAGE_COMMAND.toInt(), 1, command)
 
@@ -106,30 +112,38 @@ internal class HfSecurityFingerprintScanner(
 
     private fun initializeUsbDeviceType(device: UsbDevice): Boolean {
         deviceType = when {
-            (device.vendorId == 1107) && (device.productId == 36869) -> 0
-            (device.vendorId in listOf(8201, 8457)) && (device.productId == 30264) -> 1
-            (device.vendorId == 1155) && (device.productId == 22304) -> 2
+            (device.vendorId == 1107) && (device.productId == 36869) -> DeviceType.OtherTypes
+            device.vendorId in listOf(
+                8201,
+                8457
+            ) && (device.productId == 30264) -> DeviceType.HF4000_V1
+
+            (device.vendorId == 1155) && (device.productId == 22304) -> DeviceType.HF4000_V2
             else -> return false
         }
         return true
     }
 
     private fun sendUsbData(dataBuffer: ByteArray, length: Int): Int = when (deviceType) {
-        0 -> {
-            val buffer = ByteArray(10)
-            usbDeviceCommunicator.sendUsbControlMessage(
-                request = 0,
-                value = length,
-                buffer = buffer
-            )
-            usbDeviceCommunicator.writeUsbDevice(dataBuffer, length, TIMEOUT)
-        }
-        // HF4000
-        1, 2 -> sendUsbDataForTypeOneAndTwo(length, dataBuffer)
+        DeviceType.HF4000_V1,
+        DeviceType.HF4000_V2 -> sendUsbDataForHF4000(length, dataBuffer)
+
+        DeviceType.OtherTypes -> sendUsbDataForOtherTypes(length, dataBuffer)
+
         else -> RETURN_FAIL
     }
 
-    private fun sendUsbDataForTypeOneAndTwo(length: Int, dataBuffer: ByteArray): Int {
+    private fun sendUsbDataForOtherTypes(length: Int, dataBuffer: ByteArray): Int {
+        val buffer = ByteArray(10)
+        usbDeviceCommunicator.sendUsbControlMessage(
+            request = 0,
+            value = length,
+            buffer = buffer
+        )
+        return usbDeviceCommunicator.writeUsbDevice(dataBuffer, length, TIMEOUT)
+    }
+
+    private fun sendUsbDataForHF4000(length: Int, dataBuffer: ByteArray): Int {
         val commandStatusWrapper = ByteArray(CSW_LENGTH)
         val commandBlockWrapper = createCommandBlockWrapper(
             length = length,
@@ -155,7 +169,7 @@ internal class HfSecurityFingerprintScanner(
         ) return RETURN_FAIL
         commandStatusWrapper[3] = 0x43
 
-        if (deviceType == 1)
+        if (deviceType == DeviceType.HF4000_V1)
             for (i in 0..<12)
                 if (commandStatusWrapper[i] != commandBlockWrapper[i])
                     return RETURN_FAIL
@@ -166,24 +180,27 @@ internal class HfSecurityFingerprintScanner(
         dataBuffer: ByteArray,
         length: Int,
         timeout: Int = TIMEOUT
-    ): Boolean =
-        when (deviceType) {
-            0 -> {
-                val buffer = ByteArray(10)
-                usbDeviceCommunicator.sendUsbControlMessage(
-                    request = 1,
-                    value = length,
-                    buffer = buffer
-                )
+    ): Boolean = when (deviceType) {
+        DeviceType.HF4000_V1,
+        DeviceType.HF4000_V2 -> receiveUsbDataForHF4000(length, timeout, dataBuffer)
 
-                usbDeviceCommunicator.readUsbBulkData(dataBuffer, length, TIMEOUT) >= 0
-            }
+        DeviceType.OtherTypes -> receiveUsbDataForOtherTypes(length, dataBuffer)
 
-            1, 2 -> receiveUsbDataForTypeOneAndTwo(length, timeout, dataBuffer)
-            else -> false
-        }
+        else -> false
+    }
 
-    private fun receiveUsbDataForTypeOneAndTwo(
+    private fun receiveUsbDataForOtherTypes(length: Int, dataBuffer: ByteArray): Boolean {
+        val buffer = ByteArray(10)
+        usbDeviceCommunicator.sendUsbControlMessage(
+            request = 1,
+            value = length,
+            buffer = buffer
+        )
+
+        return usbDeviceCommunicator.readUsbBulkData(dataBuffer, length, TIMEOUT) >= 0
+    }
+
+    private fun receiveUsbDataForHF4000(
         length: Int,
         timeout: Int,
         dataBuffer: ByteArray
@@ -207,7 +224,7 @@ internal class HfSecurityFingerprintScanner(
             || commandStatusWrapper[CSW_STATUS_INDEX] != EMPTY_BYTE
         ) return false
 
-        if (deviceType == 1)
+        if (deviceType == DeviceType.HF4000_V1)
             for (i in 4..<8)
                 if (commandStatusWrapper[i] != commandBlockWrapper[i])
                     return false
@@ -216,7 +233,7 @@ internal class HfSecurityFingerprintScanner(
 
     private fun receiveUsbImage(dataBuffer: ByteArray, length: Int): Boolean {
         when (deviceType) {
-            0 -> {
+            DeviceType.OtherTypes -> {
                 val buffer = ByteArray(10)
                 val n = 8
                 val len = length / n
@@ -238,8 +255,8 @@ internal class HfSecurityFingerprintScanner(
                 }
                 return result >= 0
             }
-            // HF4000
-            1, 2 -> {
+
+            DeviceType.HF4000_V1, DeviceType.HF4000_V2 -> {
                 var result = false
                 val n = 8
                 val len = length / n
@@ -253,8 +270,9 @@ internal class HfSecurityFingerprintScanner(
                 }
                 return result
             }
+
+            else -> return false
         }
-        return false
     }
 
     private fun encodeData(
@@ -417,15 +435,22 @@ internal class HfSecurityFingerprintScanner(
         return verifyResponsePackage(receiveData)
     }
 
+    enum class DeviceType {
+        HF4000_V1,
+        HF4000_V2,
+        OtherTypes,
+        Unknown
+    }
+
     companion object {
         private const val MIN_CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD = 337_000f
         private const val MAX_CLEAN_REQUIRED_BRIGHTNESS_THRESHOLD = 475_000f
 
         fun isHfSecurityDevice(vendorId: Int, productId: Int): Boolean = when (vendorId) {
             1107 -> productId == 36869
-            8201 -> productId == 30264
+            8201 -> productId == 30264                // HF4000 V1 (Micro-USB)
             8457 -> productId == 30264
-            1155 -> productId in listOf(22304, 22240)
+            1155 -> productId in listOf(22304, 22240) // HF4000 V2 (USB-C)
             else -> false
         }
     }
