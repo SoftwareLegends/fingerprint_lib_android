@@ -111,12 +111,12 @@ internal class HfSecurityFingerprintScanner(
 
         fillPackage(dataBuffer = sendData, contentBuffer = content)
 
-        if (!sendPackage(dataBuffer = sendData)) return false
+        if (sendPackage(dataBuffer = sendData).not()) return false
 
-        if (!receivePackage(
+        if (receivePackage(
                 dataBuffer = receiveData,
                 timeout = DEFAULT_TIMEOUT
-            )
+            ).not()
         ) throw DeviceFailException()
 
         return verifyResponsePackage(dataBuffer = receiveData)
@@ -150,7 +150,7 @@ internal class HfSecurityFingerprintScanner(
         usbDeviceCommunicator.sendUsbControlMessage(
             request = SEND_CONTROL_MESSAGE_REQUEST,
             value = length,
-            buffer = ByteArray(10)
+            buffer = createByteArray()
         )
         return usbDeviceCommunicator.writeUsbDevice(
             dataSize = length,
@@ -368,8 +368,8 @@ internal class HfSecurityFingerprintScanner(
         length: Int = RECEIVED_PACKAGE_LENGTH,
         timeout: Int = RECEIVED_PACKAGE_TIMEOUT
     ): Boolean {
-        val receiveBuffer = ByteArray(1024)
         val decodedLength = IntArray(1)
+        val receiveBuffer = createByteArray(size = 1024)
         if (receiveUsbData(receiveBuffer, length, timeout).not()) return false
         if (decodeData(receiveBuffer, dataBuffer, decodedLength).not()) return false
         return true
@@ -383,7 +383,7 @@ internal class HfSecurityFingerprintScanner(
         address: Int = GENERAL_SEND_PACKAGE_ADDRESS
     ): Boolean {
         val encodedLength = IntArray(1)
-        val encodedBuffer = ByteArray(MAX_PACKAGE_SIZE + 20)
+        val encodedBuffer = createByteArray(size = MAX_PACKAGE_SIZE + 20)
 
         val packageLength = getPackageLength(dataBuffer)
         if (packageLength > MAX_PACKAGE_SIZE) return false
