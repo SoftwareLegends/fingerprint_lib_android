@@ -15,6 +15,8 @@ import com.fingerprint.utils.Constants.RECEIVED_PACKAGE_TIMEOUT
 import com.fingerprint.utils.Constants.RESPONSE_PACKET
 import com.fingerprint.utils.Constants.RETURN_FAIL
 import com.fingerprint.utils.Constants.DEFAULT_TIMEOUT
+import com.fingerprint.utils.Constants.RECEIVE_CONTROL_MESSAGE_REQUEST
+import com.fingerprint.utils.Constants.SEND_CONTROL_MESSAGE_REQUEST
 import com.fingerprint.utils.Constants.VERIFY_PASSWORD_COMMAND
 import com.fingerprint.utils.DeviceFailException
 import com.fingerprint.utils.ScannedImageType
@@ -77,11 +79,11 @@ internal class HfSecurityFingerprintScanner(
 
     override suspend fun getImageBytes(): ByteArray? {
         val imageData = ByteArray(imageType.size)
-        val result = if (imageType == ScannedImageType.Normal)
-            getImageData(imageData)
+        val isSuccess = if (imageType == ScannedImageType.Normal)
+            getImageData(imageData = imageData)
         else
-            getImageDataExtra(imageData)
-        return if (result) imageData.convertImageDataToBitmapArray(
+            getImageDataExtra(imageData = imageData)
+        return if (isSuccess) imageData.convertImageDataToBitmapArray(
             height = imageType.imageHeight,
             width = imageType.imageWidth,
             config = Bitmap.Config.ARGB_8888,
@@ -109,7 +111,7 @@ internal class HfSecurityFingerprintScanner(
 
         fillPackage(dataBuffer = sendData, length = 1, contentBuffer = content)
 
-        if (!sendPackage(sendData)) return false
+        if (!sendPackage(dataBuffer = sendData)) return false
 
         if (!receivePackage(
                 dataBuffer = receiveData,
@@ -137,21 +139,24 @@ internal class HfSecurityFingerprintScanner(
 
     private fun sendUsbData(dataBuffer: ByteArray, length: Int): Int = when (deviceType) {
         DeviceType.HF4000_V1,
-        DeviceType.HF4000_V2 -> sendUsbDataForHF4000(length, dataBuffer)
+        DeviceType.HF4000_V2 -> sendUsbDataForHF4000(length = length, dataBuffer = dataBuffer)
 
-        DeviceType.OtherTypes -> sendUsbDataForOtherTypes(length, dataBuffer)
+        DeviceType.OtherTypes -> sendUsbDataForOtherTypes(length = length, dataBuffer = dataBuffer)
 
         else -> RETURN_FAIL
     }
 
     private fun sendUsbDataForOtherTypes(length: Int, dataBuffer: ByteArray): Int {
-        val buffer = ByteArray(10)
         usbDeviceCommunicator.sendUsbControlMessage(
-            request = 0,
+            request = SEND_CONTROL_MESSAGE_REQUEST,
             value = length,
-            buffer = buffer
+            buffer = ByteArray(10)
         )
-        return usbDeviceCommunicator.writeUsbDevice(dataBuffer, length, DEFAULT_TIMEOUT)
+        return usbDeviceCommunicator.writeUsbDevice(
+            dataSize = length,
+            dataBuffer = dataBuffer,
+            timeout = DEFAULT_TIMEOUT
+        )
     }
 
     private fun sendUsbDataForHF4000(length: Int, dataBuffer: ByteArray): Int {
@@ -162,8 +167,8 @@ internal class HfSecurityFingerprintScanner(
         )
 
         if (usbDeviceCommunicator.writeUsbDevice(
-                dataBuffer = commandBlockWrapper,
-                dataSize = 31
+                dataSize = 31,
+                dataBuffer = commandBlockWrapper
             ) != 0
         ) return RETURN_FAIL
 
@@ -265,45 +270,47 @@ internal class HfSecurityFingerprintScanner(
     private fun receiveUsbImage(dataBuffer: ByteArray, length: Int): Boolean {
         when (deviceType) {
             DeviceType.OtherTypes -> {
-                val buffer = ByteArray(10)
-                val n = 8
-                val len = length / n
-                val tempBuffer = ByteArray(len)
-
-                var result = usbDeviceCommunicator.sendUsbControlMessage(
-                    request = 1,
+                var result: Int = usbDeviceCommunicator.sendUsbControlMessage(
+                    request = RECEIVE_CONTROL_MESSAGE_REQUEST,
                     value = length,
-                    index = 0,
-                    buffer = buffer,
-                    length = 10,
+                    buffer = ByteArray(10),
                 )
 
-                for (k in 0..<8) {
-                    result = usbDeviceCommunicator.readUsbBulkData(buffer = tempBuffer, length = len)
-                    val t = len * k
-                    for (i in 0..<len)
-                        dataBuffer[t + i] = tempBuffer[i]
-                }
+                result = receiveUsbImageImpl(
+                    length = length,
+                    dataBuffer = dataBuffer,
+                    receiver = usbDeviceCommunicator::readUsbBulkData
+                ) ?: result
                 return result >= 0
             }
 
-            DeviceType.HF4000_V1, DeviceType.HF4000_V2 -> {
-                var result = false
-                val n = 8
-                val len = length / n
-                val tempBuffer = ByteArray(len)
-
-                for (k in 0..<n) {
-                    result = receiveUsbData(dataBuffer = tempBuffer, length = len)
-                    val t = len * k
-                    for (i in 0..<len)
-                        dataBuffer[t + i] = tempBuffer[i]
-                }
-                return result
-            }
+            DeviceType.HF4000_V1,
+            DeviceType.HF4000_V2 -> return receiveUsbImageImpl(
+                length = length,
+                dataBuffer = dataBuffer,
+                receiver = ::receiveUsbData
+            ) == true
 
             else -> return false
         }
+    }
+
+    private fun <R> receiveUsbImageImpl(
+        length: Int,
+        dataBuffer: ByteArray,
+        receiver: (tempBuffer: ByteArray, len: Int) -> R
+    ): R? {
+        val n = 8
+        val len = length / n
+        var result: R? = null
+        val tempBuffer = ByteArray(len)
+        for (k in 0..<n) {
+            result = receiver(tempBuffer, len)
+            val t = len * k
+            for (i in 0..<len)
+                dataBuffer[t + i] = tempBuffer[i]
+        }
+        return result
     }
 
     private fun encodeData(

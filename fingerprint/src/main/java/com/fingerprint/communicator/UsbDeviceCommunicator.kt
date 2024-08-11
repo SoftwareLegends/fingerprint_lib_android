@@ -13,7 +13,7 @@ internal interface UsbDeviceCommunicator {
         value: Int,
         buffer: ByteArray,
         index: Int = 0,
-        length: Int = 10,
+        length: Int = buffer.size,
         requestType: Int = UsbOperationHelper.USB_CONTROL_MESSAGE_TYPE,
         timeout: Int = DEFAULT_TIMEOUT
     ): Int
