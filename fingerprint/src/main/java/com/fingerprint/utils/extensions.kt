@@ -128,6 +128,6 @@ internal fun ByteArray.getPixelBrightness(position: Int): Float = runCatching {
     return brightness
 }.getOrDefault(0f)
 
-fun String?.removeNullCharacter() = this?.replace("\\u0000", "")
+fun String?.removeNullCharacter() = this?.replace("\u0000", "")
 
 infix fun Byte.isEqual(other: Number) = toLong() == other.toLong()
