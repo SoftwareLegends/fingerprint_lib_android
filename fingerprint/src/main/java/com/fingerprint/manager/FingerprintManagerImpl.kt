@@ -54,6 +54,7 @@ internal class FingerprintManagerImpl(
     override val captures: MutableList<ImageBitmap> by lazy { mutableStateListOf() }
     override var bestCapture: ImageBitmap? by mutableStateOf(null)
     override var bestCaptureIndex: Int = INVALID_INDEX
+    override var isScanning: Boolean by mutableStateOf(false)
     override var isConnected: Boolean by mutableStateOf(false)
     override val deviceInfo: FingerprintDeviceInfo
         get() = fingerprintScanner?.deviceInfo ?: FingerprintDeviceInfo.Unknown
@@ -97,6 +98,7 @@ internal class FingerprintManagerImpl(
             return false
         }
         reset()
+        isScanning = true
         captureCount = count.coerceAtMost(MAX_SCAN_COUNT)
         scanningJob = scope.launch { startProcessing() }
         return true
@@ -204,6 +206,7 @@ internal class FingerprintManagerImpl(
         }
         improveTheBestCapture()
         eventsFlow.emit(FingerprintEvent.CapturedSuccessfully)
+        isScanning = false
     }.onFailure { Log.e("DEBUGGING -> startProcessing() -> ", it.toString()) }
 
     override fun improveTheBestCapture(isApplyFilters: Boolean, isBlue: Boolean) {
@@ -232,6 +235,7 @@ internal class FingerprintManagerImpl(
     private suspend fun onFingerLiftDuringScanning() {
         scanningJob?.cancel()
         isCanceled = true
+        isScanning = false
         eventsFlow.emit(FingerprintEvent.ProcessCanceledTheFingerLifted)
     }
 
@@ -241,6 +245,8 @@ internal class FingerprintManagerImpl(
         bestCapture = null
         scanningJob = null
         isCanceled = false
+        isScanning = false
+        captureCount = 0
         captureIndex = 0
         captureTimeout = 0
         progress = 0f
