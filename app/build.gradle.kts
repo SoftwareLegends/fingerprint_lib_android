@@ -12,7 +12,7 @@ plugins {
 }
 
 object Release {
-    val versionCode = 10
+    val versionCode = 13
     val versionName = "1.0.${versionCode - 1}"
 }
 
