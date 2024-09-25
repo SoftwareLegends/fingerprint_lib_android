@@ -30,6 +30,7 @@ import com.fingerprint.utils.returnUnit
 import com.fingerprint.utils.toImageBitmap
 import com.fingerprint.utils.toRawByteArray
 import com.fingerprint.utils.toRawImageBitmap
+import com.fingerprint.utils.withLock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
@@ -161,7 +162,10 @@ internal class FingerprintManagerImpl(
                                 @Suppress("DEPRECATION")
                                 intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
                             )
-                        ?: return@withLock emitEvent(FingerprintEvent.ConnectingFailed).returnUnit()
+                        ?: run {
+                            if (android12ConnectionWorkaround()) return@withLock
+                            return@withLock emitEvent(FingerprintEvent.ConnectingFailed).returnUnit()
+                        }
 
                     isUsbPermissionGranted = intent.getBooleanExtra(
                         UsbManager.EXTRA_PERMISSION_GRANTED,
@@ -198,6 +202,16 @@ internal class FingerprintManagerImpl(
         }.returnUnit()
     }
 
+    // TODO: This can be improved
+    private fun android12ConnectionWorkaround(): Boolean {
+        if (Build.VERSION.SDK_INT in listOf(Build.VERSION_CODES.S, Build.VERSION_CODES.S_V2)) {
+            disconnect()
+            connect()
+           return true
+        }
+        return false
+    }
+
     private suspend fun startProcessing() = runCatching {
         for (i in 0..<captureCount) {
             if (isCanceled) return@runCatching
@@ -210,11 +224,14 @@ internal class FingerprintManagerImpl(
     }.onFailure { Log.e("DEBUGGING -> startProcessing() -> ", it.toString()) }
 
     override fun improveTheBestCapture(isApplyFilters: Boolean, isBlue: Boolean) {
+        val isNotHF4000V1 = (fingerprintScanner as? HfSecurityFingerprintScanner)
+            ?.deviceType != HfSecurityFingerprintScanner.DeviceType.HF4000_V1
+
         captures.getOrNull(bestCaptureIndex)?.run {
             val bitmap = asAndroidBitmap()
             val byteArray = bitmap.toRawByteArray()
 
-            if (isApplyFilters)
+            if (isApplyFilters && isNotHF4000V1) {
                 for (i in byteArray.indices step 4) {
                     val brightness = byteArray.getPixelBrightness(i)
                     if (brightness <= brightnessThreshold)
@@ -228,6 +245,7 @@ internal class FingerprintManagerImpl(
                     else
                         byteArray.writeWhiteColor(i)
                 }
+            }
             bestCapture = byteArray.toRawImageBitmap(width, height)
         }
     }
@@ -394,9 +412,3 @@ private fun ByteArray.writeWhiteColor(position: Int) = writeColor(
     blue = true
 )
 
-private fun withLock(lock: Boolean, onLockChange: (Boolean) -> Unit, action: () -> Unit) {
-    if (lock) return
-    onLockChange(true)
-    action()
-    onLockChange(false)
-}
