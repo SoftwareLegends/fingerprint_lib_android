@@ -131,3 +131,10 @@ internal fun ByteArray.getPixelBrightness(position: Int): Float = runCatching {
 fun String?.removeNullCharacter() = this?.replace("\u0000", "")
 
 infix fun Byte.isEqual(other: Number) = toLong() == other.toLong()
+
+internal fun withLock(lock: Boolean, onLockChange: (Boolean) -> Unit, action: () -> Unit) {
+    if (lock) return
+    onLockChange(true)
+    action()
+    onLockChange(false)
+}
