@@ -202,6 +202,7 @@ internal class FingerprintManagerImpl(
         }.returnUnit()
     }
 
+    // TODO: This can be improved
     private fun android12ConnectionWorkaround(): Boolean {
         if (Build.VERSION.SDK_INT in listOf(Build.VERSION_CODES.S, Build.VERSION_CODES.S_V2)) {
             disconnect()
