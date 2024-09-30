@@ -17,6 +17,7 @@ interface FingerprintManager : DefaultLifecycleObserver {
     val isConnected: Boolean
     val isScanning: Boolean
 
+    fun reset()
     fun connect()
     fun disconnect()
     fun scan(count: Int): Boolean
