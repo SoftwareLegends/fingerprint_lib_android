@@ -32,6 +32,7 @@ import com.fingerprint.utils.toRawByteArray
 import com.fingerprint.utils.toRawImageBitmap
 import com.fingerprint.utils.withLock
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
@@ -249,14 +250,8 @@ internal class FingerprintManagerImpl(
         }
     }
 
-    private suspend fun onFingerLiftDuringScanning() {
-        scanningJob?.cancel()
-        isCanceled = true
-        isScanning = false
-        eventsFlow.emit(FingerprintEvent.ProcessCanceledTheFingerLifted)
-    }
-
-    private fun reset() {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun reset() {
         scanningJob?.cancel()
         captures.clear()
         bestCapture = null
@@ -269,6 +264,14 @@ internal class FingerprintManagerImpl(
         progress = 0f
         bestCaptureIndex = INVALID_INDEX
         bestCaptureValue = MIN_VALUE
+        eventsFlow.resetReplayCache()
+    }
+
+    private suspend fun onFingerLiftDuringScanning() {
+        scanningJob?.cancel()
+        isCanceled = true
+        isScanning = false
+        eventsFlow.emit(FingerprintEvent.ProcessCanceledTheFingerLifted)
     }
 
     private suspend fun processCapture() {
