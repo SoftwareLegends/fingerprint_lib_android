@@ -163,8 +163,11 @@ internal class FingerprintManagerImpl(
                                 intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
                             )
                         ?: run {
-                            if (android12ConnectionWorkaround()) return@withLock
-                            return@withLock emitEvent(FingerprintEvent.ConnectingFailed).returnUnit()
+                            connectionFailingWorkaround()
+                            if (!isConnected) {
+                                return@withLock emitEvent(FingerprintEvent.ConnectingFailed).returnUnit()
+                            }
+                            return@withLock
                         }
 
                     isUsbPermissionGranted = intent.getBooleanExtra(
@@ -203,13 +206,9 @@ internal class FingerprintManagerImpl(
     }
 
     // TODO: This can be improved
-    private fun android12ConnectionWorkaround(): Boolean {
-        if (Build.VERSION.SDK_INT in listOf(Build.VERSION_CODES.S, Build.VERSION_CODES.S_V2)) {
-            disconnect()
-            connect()
-           return true
-        }
-        return false
+    private fun connectionFailingWorkaround() {
+        disconnect()
+        connect()
     }
 
     private suspend fun startProcessing() = runCatching {
