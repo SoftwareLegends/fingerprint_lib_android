@@ -157,14 +157,20 @@ The `FingerprintManager` interface exposes convenient methods and properties for
 
 ```kotlin
 interface FingerprintManager : DefaultLifecycleObserver {
-    val eventsFlow: StateFlow<FingerprintEvent>
+    val eventsFlow: SharedFlow<FingerprintEvent>
     val captures: List<ImageBitmap>
     val bestCapture: ImageBitmap?
     val bestCaptureIndex: Int
+    val deviceInfo: FingerprintDeviceInfo
+    val progress: Float
+    val isConnected: Boolean
+    val isScanning: Boolean
 
+    fun reset()
     fun connect()
     fun disconnect()
     fun scan(count: Int): Boolean
+    fun improveTheBestCapture(isApplyFilters: Boolean = false, isBlue: Boolean = false)
 
     override fun onResume(owner: LifecycleOwner) = connect()
     override fun onStop(owner: LifecycleOwner) = disconnect()
@@ -176,7 +182,7 @@ interface FingerprintManager : DefaultLifecycleObserver {
 ## 🤝  Supported Fingerprint Scanners
 
 - **[HF Security](https://hfsecurity.cn/)**
-    - [HF4000](https://hfsecurity.cn/hf4000-optical-android-fingerprint-scanner/) `(Tested and verified)` ✅H
+    - [HF4000](https://hfsecurity.cn/hf4000-optical-android-fingerprint-scanner/) `(Tested and verified)` ✅
     - Other models may also be compatible.
 - **[Futronic](https://www.futronic-tech.com/)**
     - [FS80H](https://www.futronic-tech.com/pro-detail.php?pro_id=1543) `(Tested and verified)` ✅
