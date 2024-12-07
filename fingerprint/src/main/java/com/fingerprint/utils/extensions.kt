@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.hardware.usb.UsbDevice
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -138,3 +139,5 @@ internal fun withLock(lock: Boolean, onLockChange: (Boolean) -> Unit, action: ()
     action()
     onLockChange(false)
 }
+
+internal fun UsbDevice.firstInterfaceOrNull() = runCatching { getInterface(0) }.getOrNull()

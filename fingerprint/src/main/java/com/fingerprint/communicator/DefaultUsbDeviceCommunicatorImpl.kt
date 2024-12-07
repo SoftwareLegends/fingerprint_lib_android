@@ -11,6 +11,7 @@ import androidx.core.content.getSystemService
 import com.fingerprint.utils.Constants.DEVICE_FAIL
 import com.fingerprint.utils.Constants.RETURN_FAIL
 import com.fingerprint.utils.Constants.RETURN_OK
+import com.fingerprint.utils.firstInterfaceOrNull
 
 
 internal class DefaultUsbDeviceCommunicatorImpl(
@@ -33,7 +34,7 @@ internal class DefaultUsbDeviceCommunicatorImpl(
     override fun openUsbDeviceConnection(usbDevice: UsbDevice): Boolean {
         usbConnection = usbManager?.openDevice(usbDevice) ?: return false
 
-        usbInterface = usbDevice.getInterface(0)
+        usbInterface = usbDevice.firstInterfaceOrNull() ?: return false
         usbConnection?.claimInterface(usbInterface, true)
 
         usbInterface?.let { usbInterface ->
